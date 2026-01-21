@@ -7,6 +7,95 @@ export const getIndexPageText = async () => {
     description: tIndex('description'),
     h1Text: tIndex('h1Text'),
     descriptionBelowH1Text: tIndex('descriptionBelowH1Text'),
+    startCleaning: tIndex('startCleaning'),
+    toolsTitle: tIndex('toolsTitle'),
+    toolShadowTitle: tIndex('toolShadowTitle'),
+    toolShadowDesc: tIndex('toolShadowDesc'),
+    toolEmojiTitle: tIndex('toolEmojiTitle'),
+    toolEmojiDesc: tIndex('toolEmojiDesc'),
+    toolColorTitle: tIndex('toolColorTitle'),
+    toolColorDesc: tIndex('toolColorDesc'),
+    whyTitle: tIndex('whyTitle'),
+    why1Title: tIndex('why1Title'),
+    why1Desc: tIndex('why1Desc'),
+    why2Title: tIndex('why2Title'),
+    why2Desc: tIndex('why2Desc'),
+    why3Title: tIndex('why3Title'),
+    why3Desc: tIndex('why3Desc'),
+    faqTitle: tIndex('faqTitle'),
+    faq1Question: tIndex('faq1Question'),
+    faq1Answer: tIndex('faq1Answer'),
+    faq2Question: tIndex('faq2Question'),
+    faq2Answer: tIndex('faq2Answer'),
+    faq3Question: tIndex('faq3Question'),
+    faq3Answer: tIndex('faq3Answer'),
+  }
+}
+
+export const getToolPageText = async () => {
+  const tTool = await getTranslations('ToolPageText');
+  return {
+    uploadTitle: tTool('uploadTitle'),
+    uploadDesc: tTool('uploadDesc'),
+    download: tTool('download'),
+    original: tTool('original'),
+    processed: tTool('processed'),
+    processButton: tTool('processButton'),
+    stepTitle: tTool('stepTitle'),
+    step1: tTool('step1'),
+    step2: tTool('step2'),
+    step3: tTool('step3'),
+    aboutTitle: tTool('aboutTitle'),
+    faqTitle: tTool('faqTitle'),
+  }
+}
+
+export const getRemoveShadowPageText = async () => {
+  const tPage = await getTranslations('RemoveShadowPage');
+  return {
+    title: tPage('title'),
+    h1: tPage('h1'),
+    description: tPage('description'),
+    aboutDesc: tPage('aboutDesc'),
+    faq1Q: tPage('faq1Q'),
+    faq1A: tPage('faq1A'),
+  }
+}
+
+export const getRemoveEmojiPageText = async () => {
+  const tPage = await getTranslations('RemoveEmojiPage');
+  return {
+    title: tPage('title'),
+    h1: tPage('h1'),
+    description: tPage('description'),
+    aboutDesc: tPage('aboutDesc'),
+    faq1Q: tPage('faq1Q'),
+    faq1A: tPage('faq1A'),
+  }
+}
+
+export const getRemoveColorPageText = async () => {
+  const tPage = await getTranslations('RemoveColorPage');
+  return {
+    title: tPage('title'),
+    h1: tPage('h1'),
+    description: tPage('description'),
+    aboutDesc: tPage('aboutDesc'),
+    faq1Q: tPage('faq1Q'),
+    faq1A: tPage('faq1A'),
+    faq2Q: tPage('faq2Q'),
+    faq2A: tPage('faq2A'),
+    faq3Q: tPage('faq3Q'),
+    faq3A: tPage('faq3A'),
+    faq4Q: tPage('faq4Q'),
+    faq4A: tPage('faq4A'),
+    howTitle: tPage('howTitle'),
+    how1: tPage('how1'),
+    how2: tPage('how2'),
+    how3: tPage('how3'),
+    how4: tPage('how4'),
+    how5: tPage('how5'),
+    how6: tPage('how6'),
   }
 }
 

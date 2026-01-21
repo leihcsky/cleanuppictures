@@ -71,7 +71,7 @@ const authOptions: NextAuthOptions = {
       if (session) {
         const email = session?.user?.email;
         if (email) {
-          session.user = await getUserByEmail(email);
+          // session.user = await getUserByEmail(email);
           return session;
         }
       }

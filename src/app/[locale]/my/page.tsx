@@ -1,15 +1,13 @@
 import PageComponent from "./PageComponent";
-import { setRequestLocale } from 'next-intl/server';
-
-import {
-  getWorksText
-} from "~/i18n/languageText";
 
 export default async function IndexPage({ params: { locale = '' } }) {
   // Enable static rendering
+  const { setRequestLocale } = await import('next-intl/server');
   setRequestLocale(locale);
 
-  const worksText = await getWorksText();
+  const languageModule = await import('~/i18n/languageText');
+
+  const worksText = await languageModule.getWorksText();
 
   return (
     <PageComponent

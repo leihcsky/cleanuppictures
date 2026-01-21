@@ -1,31 +1,19 @@
 import PageComponent from "./PageComponent";
-import { setRequestLocale } from 'next-intl/server';
-
-import {
-  getIndexPageText,
-  getQuestionText
-} from "~/i18n/languageText";
-import { getLatestPublicResultList } from "~/servers/works";
+// Server-only imports moved into function scope
 
 export const revalidate = 120;
 export default async function IndexPage({ params: { locale = '' }, searchParams: searchParams }) {
   // Enable static rendering
+  const { setRequestLocale } = await import('next-intl/server');
   setRequestLocale(locale);
 
-  const indexText = await getIndexPageText();
-  const questionText = await getQuestionText();
-
-  const resultInfoListInit = await getLatestPublicResultList(locale, 1);
+  const languageModule = await import('~/i18n/languageText');
+  const indexText = await languageModule.getIndexPageText();
 
   return (
     <PageComponent
       locale={locale}
       indexText={indexText}
-      questionText={questionText}
-      resultInfoListInit={resultInfoListInit}
-      searchParams={searchParams}
     />
   )
-
-
 }
