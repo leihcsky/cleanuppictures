@@ -46,7 +46,7 @@ export default function Header({
   }
 
   return (
-    <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-full border border-gray-200 bg-white/80 backdrop-blur-md shadow-sm transition-all duration-300">
+    <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-full border border-slate-300 bg-slate-50/90 backdrop-blur-md shadow-md transition-all duration-300">
       <LoadingModal loadingText={commonText.loadingText} />
       <GeneratingModal generatingText={commonText.generateText} />
       <LoginModal

@@ -3,7 +3,6 @@ import React, {useState} from 'react'
 import {useRouter} from 'next/navigation'
 import {whiteLoadingSvg} from './svg';
 import {useCommonContext} from '~/context/common-context';
-import {useSession} from "next-auth/react";
 
 const LoginButton = ({
                        buttonType = 0,
@@ -11,7 +10,6 @@ const LoginButton = ({
                      }) => {
 
   const router = useRouter();
-  const {data: session, status} = useSession();
 
   const {
     userData,
@@ -26,10 +24,7 @@ const LoginButton = ({
     setLoading(true)
     let _userData;
     if (userData == null || Object.keys(userData).length == 0) {
-      if (status == 'authenticated') {
-        setUserData(session?.user)
-        _userData = session?.user
-      }
+      _userData = null
     } else {
       _userData = userData
     }

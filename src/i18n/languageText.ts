@@ -2,9 +2,10 @@ import {getTranslations} from "next-intl/server";
 
 export const getIndexPageText = async () => {
   const tIndex = await getTranslations('IndexPageText');
+  const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || '';
   return {
-    title: tIndex('title'),
-    description: tIndex('description'),
+    title: tIndex('title').replace(/%brand%/g, brand),
+    description: tIndex('description').replace(/%brand%/g, brand),
     h1Text: tIndex('h1Text'),
     descriptionBelowH1Text: tIndex('descriptionBelowH1Text'),
     startCleaning: tIndex('startCleaning'),
@@ -15,7 +16,21 @@ export const getIndexPageText = async () => {
     toolEmojiDesc: tIndex('toolEmojiDesc'),
     toolColorTitle: tIndex('toolColorTitle'),
     toolColorDesc: tIndex('toolColorDesc'),
-    whyTitle: tIndex('whyTitle'),
+    positioningTitle: tIndex('positioningTitle'),
+    positioningDesc: tIndex('positioningDesc'),
+    usersTitle: tIndex('usersTitle'),
+    user1: tIndex('user1'),
+    user2: tIndex('user2'),
+    user3: tIndex('user3'),
+    user4: tIndex('user4'),
+    user5: tIndex('user5'),
+    introTitle: tIndex('introTitle'),
+    intro1: tIndex('intro1'),
+    intro2: tIndex('intro2'),
+    intro3: tIndex('intro3'),
+    removeWhatTitle: tIndex('removeWhatTitle'),
+    removeWhatDesc: tIndex('removeWhatDesc'),
+    whyTitle: tIndex('whyTitle').replace(/%brand%/g, brand),
     why1Title: tIndex('why1Title'),
     why1Desc: tIndex('why1Desc'),
     why2Title: tIndex('why2Title'),
@@ -23,12 +38,22 @@ export const getIndexPageText = async () => {
     why3Title: tIndex('why3Title'),
     why3Desc: tIndex('why3Desc'),
     faqTitle: tIndex('faqTitle'),
+    faqSubtitle: tIndex('faqSubtitle'),
     faq1Question: tIndex('faq1Question'),
     faq1Answer: tIndex('faq1Answer'),
     faq2Question: tIndex('faq2Question'),
-    faq2Answer: tIndex('faq2Answer'),
+    faq2Answer: tIndex('faq2Answer').replace(/%brand%/g, brand),
     faq3Question: tIndex('faq3Question'),
     faq3Answer: tIndex('faq3Answer'),
+    faq4Question: tIndex('faq4Question'),
+    faq4Answer: tIndex('faq4Answer'),
+    faq5Question: tIndex('faq5Question'),
+    faq5Answer: tIndex('faq5Answer'),
+    faq6Question: tIndex('faq6Question'),
+    faq6Answer: tIndex('faq6Answer'),
+    faq7Question: tIndex('faq7Question'),
+    faq7Answer: tIndex('faq7Answer'),
+    howTitleHome: tIndex('howTitleHome'),
   }
 }
 
@@ -43,10 +68,16 @@ export const getToolPageText = async () => {
     processButton: tTool('processButton'),
     stepTitle: tTool('stepTitle'),
     step1: tTool('step1'),
+    step1Sub: tTool('step1Sub'),
     step2: tTool('step2'),
+    step2Sub: tTool('step2Sub'),
     step3: tTool('step3'),
+    step3Sub: tTool('step3Sub'),
     aboutTitle: tTool('aboutTitle'),
     faqTitle: tTool('faqTitle'),
+    tolTip: tTool('tolTip'),
+    refineTip: tTool('refineTip'),
+    autoRefineTip: tTool('autoRefineTip'),
   }
 }
 

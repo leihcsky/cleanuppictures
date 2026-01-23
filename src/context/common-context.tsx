@@ -1,6 +1,5 @@
 'use client';
-import {createContext, useContext, useState} from "react";
-import {useSession} from "next-auth/react";
+import {createContext, useContext, useEffect, useState} from "react";
 import {useInterval} from "ahooks";
 
 
@@ -13,7 +12,6 @@ export const CommonProvider = ({
                                  pricingText
                                }) => {
 
-  const {data: session, status} = useSession();
   const [userData, setUserData] = useState({});
   const [intervalUserData, setIntervalUserData] = useState(1000);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -22,23 +20,32 @@ export const CommonProvider = ({
   const [showGeneratingModal, setShowGeneratingModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
 
-
   useInterval(() => {
     init();
   }, intervalUserData);
 
+  useEffect(() => {
+    init();
+  }, []);
+
   async function init() {
-    if (status == 'authenticated') {
-      const userData = {
-        // @ts-ignore
-        user_id: session?.user?.user_id,
-        name: session?.user?.name,
-        email: session?.user?.email,
-        image: session?.user?.image,
+    try {
+      const { getSession } = await import('next-auth/react');
+      const session = await getSession();
+      if (session && session.user) {
+        const user = {
+          // @ts-ignore
+          user_id: session?.user?.user_id,
+          name: session?.user?.name,
+          email: session?.user?.email,
+          image: session?.user?.image,
+        }
+        setUserData(user);
+        setShowLoginModal(false);
+        setIntervalUserData(undefined);
       }
-      setUserData(userData);
-      setShowLoginModal(false);
-      setIntervalUserData(undefined);
+    } catch (e) {
+      // ignore
     }
   }
 

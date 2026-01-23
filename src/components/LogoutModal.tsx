@@ -1,7 +1,6 @@
 import {Fragment, useRef} from 'react'
 import {Dialog, Transition} from '@headlessui/react'
 import {useCommonContext} from "~/context/common-context";
-import {signOut} from "next-auth/react";
 
 export default function LogoutModal({
                                       logoutModalDesc,
@@ -15,7 +14,9 @@ export default function LogoutModal({
 
   const confirmButton = () => {
     sessionStorage.removeItem("user_id");
-    signOut({callbackUrl: redirectPath}).then(r => console.log(r))
+    import('next-auth/react').then(({ signOut }) => {
+      signOut({callbackUrl: redirectPath}).then(r => console.log(r))
+    })
   }
 
   return (

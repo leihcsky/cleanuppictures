@@ -16,7 +16,7 @@ const useOneTapSignin = (options?: OneTapSigninOptions & Pick<SignInOptions, "re
     required: true,
     onUnauthenticated() {
       if (!showLoadingModal) {
-        const { google } = window;
+        const google = (window as any)?.google;
         if (google) {
           google.accounts.id.initialize({
             client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
