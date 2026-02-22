@@ -46,6 +46,8 @@ const hueDelta = (h1, h2) => {
   return d > 180 ? 360 - d : d;
 };
 
+const isNeutralSat = (s) => s <= 0.12;
+
 const dilate = (src, w, h, r) => {
   const dst = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
@@ -270,18 +272,27 @@ export default function RemoveColorTool({
         for (let i = 0; i < data.length; i += 4) {
           const r = src[i], g = src[i + 1], b = src[i + 2];
           const pv = rgbToHsv(r, g, b);
-          if (pv.s < minSat) continue;
           let hit = false;
           for (let j = 0; j < globals.length; j++) {
             const tg = globals[j];
             const tUse = typeof tg.tTol === 'number' ? tg.tTol : tolerance;
-            const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
-            const sTol = (tUse / 150) * 0.35;
-            const vTol = (tUse / 150) * 0.35;
-            const dh = hueDelta(pv.h, tg.h);
-            if (dh <= hueTol && Math.abs(pv.s - tg.s) <= sTol && Math.abs(pv.v - tg.v) <= vTol) {
-              hit = true;
-              break;
+            if (isNeutralSat(tg.s)) {
+              const sLimit = Math.min(0.25, tg.s + (tUse / 150) * 0.20);
+              const vTol = (tUse / 150) * 0.25 + 0.04;
+              if (pv.s <= sLimit && Math.abs(pv.v - tg.v) <= vTol) {
+                hit = true;
+                break;
+              }
+            } else {
+              if (pv.s < minSat) continue;
+              const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
+              const sTol = (tUse / 150) * 0.35;
+              const vTol = (tUse / 150) * 0.35;
+              const dh = hueDelta(pv.h, tg.h);
+              if (dh <= hueTol && Math.abs(pv.s - tg.s) <= sTol && Math.abs(pv.v - tg.v) <= vTol) {
+                hit = true;
+                break;
+              }
             }
           }
           if (hit) data[i + 3] = 0;
@@ -309,9 +320,22 @@ export default function RemoveColorTool({
             const off = idx * 4;
             const r = src[off], g = src[off + 1], b = src[off + 2];
             const pv = rgbToHsv(r, g, b);
-            if (pv.s < minSat) continue;
-            const dh = hueDelta(pv.h, seed.h);
-            if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) {
+            let matched = false;
+            if (isNeutralSat(seed.s)) {
+              const sLimit = Math.min(0.25, seed.s + (tUse / 150) * 0.20);
+              const vTolN = (tUse / 150) * 0.25 + 0.04;
+              if (pv.s <= sLimit && Math.abs(pv.v - seed.v) <= vTolN) {
+                matched = true;
+              }
+            } else {
+              if (pv.s >= minSat) {
+                const dh = hueDelta(pv.h, seed.h);
+                if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) {
+                  matched = true;
+                }
+              }
+            }
+            if (matched) {
               data[off + 3] = 0;
               if (x > 0) { q[qj++] = x - 1; q[qj++] = y; }
               if (x < w - 1) { q[qj++] = x + 1; q[qj++] = y; }

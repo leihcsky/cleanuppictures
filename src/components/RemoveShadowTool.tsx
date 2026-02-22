@@ -19,11 +19,13 @@ export default function RemoveShadowTool({
   const { setShowLoadingModal } = useCommonContext();
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
-  const [strength, setStrength] = useState<number>(65); // 0-100
+  const [strength, setStrength] = useState<number>(90); // 0-100
   const [downloadFormat, setDownloadFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg'); // JPG 默认
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [aggressive, setAggressive] = useState<boolean>(true);
   const [bias, setBias] = useState<number>(60);
+  const [extreme, setExtreme] = useState<boolean>(true);
+  const [targetBright, setTargetBright] = useState<number>(92);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -201,6 +203,21 @@ export default function RemoveShadowTool({
       bkgLik[k] = Math.max(0, Math.min(1, bgScore * varFactor));
     }
     const bkgSm = blurFloat(bkgLik, w, h, Math.max(2, Math.round(radiusBase / 2)));
+    // Fallback cast-shadow detection: compare to a larger illumination baseline and
+    // weight by background likelihood and low-edge regions to avoid subject brightening.
+    const rShadow = Math.max(18, Math.round(radiusBase * 3));
+    const illumHuge = blurFloat(lum, w, h, rShadow);
+    const castRaw = new Float32Array(w * h);
+    const epsCast = 1e-3;
+    for (let k = 0; k < castRaw.length; k++) {
+      const dl = Math.max(0, illumHuge[k] - lum[k]);
+      const rel = dl / Math.max(epsCast, illumHuge[k]);
+      const bgw = Math.max(0.15, Math.min(1, bkgLik[k]));
+      const edgeAvoid = Math.max(0, 1 - gradSm[k]);
+      castRaw[k] = Math.max(0, Math.min(1, rel * (0.5 * bgw + 0.5 * edgeAvoid)));
+    }
+    const castGF0 = guidedFilter(lum, castRaw, w, h, Math.max(2, Math.round(radiusBase / 2)), 1e-2);
+    const castMask = blurFloat(castGF0, w, h, Math.max(2, Math.round(radiusBase / 2)));
     const mask0 = new Float32Array(w * h);
     for (let k = 0; k < mask0.length; k++) {
       const d = lumGF[k] - lum[k];
@@ -217,6 +234,7 @@ export default function RemoveShadowTool({
       maskCast0[k] = Math.max(base, base * (0.5 + 0.5 * darkBoost));
     }
     const maskGF = guidedFilter(lum, maskCast0, w, h, Math.max(2, Math.round(radiusBase / 2)), 1e-2);
+    const maskWide = blurFloat(maskGF, w, h, Math.max(2, Math.round(radiusBase / 2)));
     const r1 = Math.max(3, Math.round(radiusBase / 2));
     const r2 = Math.max(4, radiusBase);
     const r3 = Math.max(6, Math.round(radiusBase * 2));
@@ -265,9 +283,16 @@ export default function RemoveShadowTool({
     for (let p = 0, i = 0; p < lum.length; p++, i += 4) {
       const dr = Math.max(0, Math.min(1, meanLumLarge[p] - lum[p]));
       const varGain = 0.6 + 0.4 * (1 - varLumN[p]);
-      const wDark = Math.max(0, Math.min(1, dr * varGain * (1 - sat[p]) * bParam));
-      const wBase = Math.max(0, Math.min(1, maskGF[p]));
+      const wDark = Math.max(0, Math.min(1, dr * varGain * (1 - sat[p]) * bParam * Math.max(0.25, bkgLik[p])));
+      // subject likelihood and flat background weight
+      const flatBg = Math.max(0, Math.min(1, (1 - varLumN[p]) * (1 - gradSm[p])));
+      const subjectLik = Math.max(0, Math.min(1, 0.4 * varLumN[p] + 0.4 * gradSm[p] + 0.2 * sat[p]));
+      const isCast = castMask[p] > 0.25 && lum[p] < meanLumLarge[p] * 0.97;
+      const baseCast = isCast ? Math.max(0, Math.min(1, castMask[p] * (0.6 * bkgLik[p] + 0.4 * flatBg))) : 0;
+      const baseSoft = Math.max(0, Math.min(1, maskWide[p] * (1 - subjectLik)));
+      const wBase = Math.max(baseCast, baseSoft * 0.8);
       const wMask = Math.pow(Math.max(wBase, wDark), 0.9) * s;
+      const wStrong = extreme ? Math.min(1, wMask * 1.8) : wMask;
       if (wMask <= 0) continue;
       const L = lum[p];
       const Lm = lumGF[p];
@@ -278,12 +303,19 @@ export default function RemoveShadowTool({
       const wS = Math.max(0, Math.min(1, 0.6 * wBase + 0.4 * (retNeg[p] / retMax)));
       const tRef = s * wS * (0.6 + 0.4 * (bias / 100));
       const scaleRef = Math.max(1, Math.min(aggressive ? 2.8 : 2.3, 1 + tRef * Math.max(0, (refMean / Math.max(L, eps) - 1))));
-      const scale = Math.max(scale0, Math.max(scale1, scaleRef));
+      const shade = Math.min(1, Math.max(eps, L / Math.max(eps, meanLumLarge[p])));
+      const kShade = (0.35 + 0.65 * (bias / 100)) * (aggressive ? 1.3 : 1.0);
+      const scaleShade = Math.max(1, Math.min(aggressive ? 3.0 : 2.5, Math.pow(1 / Math.max(eps, shade), kShade) * wMask + (1 - wMask)));
+      const tb = Math.min(0.98, Math.max(0.6, targetBright / 100));
+      const scaleTB = Math.max(1, Math.min(extreme ? 3.8 : 2.8, 1 + wStrong * Math.max(0, tb / Math.max(L, eps) - 1)));
+      const wCast = Math.max(0, Math.min(1, castMask[p]));
+      const scaleCast = Math.max(1, Math.min(extreme ? 4.2 : 3.2, 1 + wCast * Math.max(0, tb / Math.max(L, eps) - 1)));
+      const scale = Math.max(scale0, Math.max(scale1, Math.max(scaleRef, Math.max(scaleShade, Math.max(scaleTB, scaleCast)))));
       const r0 = data[i], g0 = data[i + 1], b0 = data[i + 2];
-      const r1 = Math.max(0, Math.min(255, Math.round(r0 * Math.pow(scale, 0.78))));
-      const g1 = Math.max(0, Math.min(255, Math.round(g0 * Math.pow(scale, 0.78))));
-      const b1 = Math.max(0, Math.min(255, Math.round(b0 * Math.pow(scale, 0.78))));
-      const cBlend = (aggressive ? 0.08 : 0.07) * wMask;
+      const r1 = Math.max(0, Math.min(255, Math.round(r0 * Math.pow(scale, extreme ? 0.72 : 0.78))));
+      const g1 = Math.max(0, Math.min(255, Math.round(g0 * Math.pow(scale, extreme ? 0.72 : 0.78))));
+      const b1 = Math.max(0, Math.min(255, Math.round(b0 * Math.pow(scale, extreme ? 0.72 : 0.78))));
+      const cBlend = (aggressive ? 0.14 : 0.10) * wStrong;
       const r2 = Math.max(0, Math.min(255, Math.round(r1 * (1 - cBlend) + rGF[p] * cBlend)));
       const g2 = Math.max(0, Math.min(255, Math.round(g1 * (1 - cBlend) + gGF[p] * cBlend)));
       const b2 = Math.max(0, Math.min(255, Math.round(b1 * (1 - cBlend) + bGF[p] * cBlend)));
@@ -409,6 +441,48 @@ export default function RemoveShadowTool({
             "isPartOf": { "@type": "WebSite", "name": process.env.NEXT_PUBLIC_DOMAIN_NAME }
           })}
         </Script>
+        <Script
+          id="remove-shadow-faq-ld"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify((() => {
+              const faqs = [
+                { q: pageText.faq1Q, a: pageText.faq1A },
+                { q: pageText.faq2Q, a: pageText.faq2A },
+                { q: pageText.faq3Q, a: pageText.faq3A },
+                { q: pageText.faq4Q, a: pageText.faq4A },
+              ].filter(f => f && f.q && f.a);
+              if (!faqs.length) return null;
+              return {
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                "mainEntity": faqs.map(f => ({
+                  "@type": "Question",
+                  "name": f.q,
+                  "acceptedAnswer": { "@type": "Answer", "text": f.a }
+                }))
+              }
+            })())
+          }}
+        />
+        <Script
+          id="remove-shadow-howto-ld"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "HowTo",
+              "name": pageText.howTitle,
+              "step": [
+                pageText.how1 ? { "@type": "HowToStep", "name": pageText.how1 } : null,
+                pageText.how2 ? { "@type": "HowToStep", "name": pageText.how2 } : null,
+                pageText.how3 ? { "@type": "HowToStep", "name": pageText.how3 } : null
+              ].filter(Boolean)
+            })
+          }}
+        />
         <div className="relative pt-32 pb-16">
           <div className="mx-auto max-w-7xl px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center mb-10">
@@ -471,6 +545,21 @@ export default function RemoveShadowTool({
                           max={100}
                           value={bias}
                           onChange={(e) => setBias(Number(e.target.value))}
+                          className="w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                        <button
+                          onClick={() => setExtreme(!extreme)}
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${extreme ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-600'}`}
+                        >
+                          Extreme
+                        </button>
+                        <span className="ml-2 text-xs text-gray-600">Target Brightness: {targetBright}</span>
+                        <input
+                          type="range"
+                          min={60}
+                          max={98}
+                          value={targetBright}
+                          onChange={(e) => setTargetBright(Number(e.target.value))}
                           className="w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                         />
                       </div>
@@ -569,6 +658,77 @@ export default function RemoveShadowTool({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 pb-20">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{toolText.aboutTitle}</h2>
+            <p className="mt-2 text-sm text-gray-600">{pageText.aboutDesc}</p>
+          </div>
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-10">
+            <section>
+              <h3 className="text-2xl font-semibold text-slate-900 mb-3">{pageText.howTitle}</h3>
+              <ul className="space-y-2 text-slate-700">
+                {pageText.how1 ? <li>• {pageText.how1}</li> : null}
+                {pageText.how2 ? <li>• {pageText.how2}</li> : null}
+                {pageText.how3 ? <li>• {pageText.how3}</li> : null}
+              </ul>
+            </section>
+            <section>
+              <h3 className="text-2xl font-semibold text-slate-900 mb-3">{pageText.whatTitle}</h3>
+              <ul className="space-y-2 text-slate-700">
+                {pageText.what1 ? <li>• {pageText.what1}</li> : null}
+                {pageText.what2 ? <li>• {pageText.what2}</li> : null}
+                {pageText.what3 ? <li>• {pageText.what3}</li> : null}
+                {pageText.what4 ? <li>• {pageText.what4}</li> : null}
+              </ul>
+            </section>
+            <section>
+              <h3 className="text-2xl font-semibold text-slate-900 mb-3">{pageText.useTitle}</h3>
+              <ul className="space-y-2 text-slate-700">
+                {pageText.use1 ? <li>• {pageText.use1}</li> : null}
+                {pageText.use2 ? <li>• {pageText.use2}</li> : null}
+                {pageText.use3 ? <li>• {pageText.use3}</li> : null}
+                {pageText.use4 ? <li>• {pageText.use4}</li> : null}
+              </ul>
+            </section>
+            <section>
+              <h3 className="text-2xl font-semibold text-slate-900 mb-3">{pageText.formatsTitle}</h3>
+              <ul className="space-y-2 text-slate-700">
+                {pageText.format1 ? <li>• {pageText.format1}</li> : null}
+                {pageText.format2 ? <li>• {pageText.format2}</li> : null}
+                {pageText.format3 ? <li>• {pageText.format3}</li> : null}
+              </ul>
+            </section>
+          </div>
+          <div className="mt-16 mx-auto max-w-3xl">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{toolText.faqTitle}</h2>
+            <div className="mt-6 space-y-6">
+              {pageText.faq1Q && pageText.faq1A ? (
+                <div>
+                  <p className="font-semibold text-slate-900">{pageText.faq1Q}</p>
+                  <p className="text-slate-700 mt-1">{pageText.faq1A}</p>
+                </div>
+              ) : null}
+              {pageText.faq2Q && pageText.faq2A ? (
+                <div>
+                  <p className="font-semibold text-slate-900">{pageText.faq2Q}</p>
+                  <p className="text-slate-700 mt-1">{pageText.faq2A}</p>
+                </div>
+              ) : null}
+              {pageText.faq3Q && pageText.faq3A ? (
+                <div>
+                  <p className="font-semibold text-slate-900">{pageText.faq3Q}</p>
+                  <p className="text-slate-700 mt-1">{pageText.faq3A}</p>
+                </div>
+              ) : null}
+              {pageText.faq4Q && pageText.faq4A ? (
+                <div>
+                  <p className="font-semibold text-slate-900">{pageText.faq4Q}</p>
+                  <p className="text-slate-700 mt-1">{pageText.faq4A}</p>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

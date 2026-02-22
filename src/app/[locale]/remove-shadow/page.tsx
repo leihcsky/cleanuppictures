@@ -18,6 +18,7 @@ export async function generateMetadata({ params: { locale = '' } }) {
     description,
     keywords: [
       brand,
+      'remove shadow from photo',
       'reduce shadow',
       'shadow reduction',
       'improve photo lighting',
@@ -59,4 +60,3 @@ export default async function Page({ params: { locale = '' } }) {
     />
   )
 }
-

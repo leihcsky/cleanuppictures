@@ -38,7 +38,13 @@ export default async function LocaleLayout({
   return (
     <html lang={locale}>
       <head>
-        <script src="https://accounts.google.com/gsi/client" async defer></script>
+        {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' ? (
+          <script
+            src="https://accounts.google.com/gsi/client"
+            async
+            defer
+          ></script>
+        ) : null}
       </head>
       <body suppressHydrationWarning={true} className={clsx(inter.className, 'flex flex-col background-div')}>
         <NextAuthProvider>
