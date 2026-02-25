@@ -1335,6 +1335,24 @@ export default function RemoveColorTool({
                  {pageText.aboutDesc}
                </p>
 
+               {pageText.featureTitle && (
+                 <>
+                   <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.featureTitle}</h2>
+                   <p className="mt-4 text-lg leading-8 text-gray-600">
+                     {pageText.featureDesc}
+                   </p>
+                 </>
+               )}
+
+               {pageText.useCasesTitle && (
+                 <>
+                   <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.useCasesTitle}</h2>
+                   <div className="mt-4 text-lg leading-8 text-gray-600 whitespace-pre-line">
+                     <div dangerouslySetInnerHTML={{ __html: (pageText.useCasesDesc || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                   </div>
+                 </>
+               )}
+
                <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.howTitle ?? toolText.stepTitle}</h2>
                <ul className="mt-4 list-disc pl-5 space-y-2 text-gray-600">
                   {(pageText.how1 || toolText.step1) && <li>{pageText.how1 ?? toolText.step1}</li>}

@@ -149,10 +149,14 @@
     "faq1A": "Yes, it works perfectly on mobile browsers."
   },
   "RemoveColorPage": {
-    "title": "Remove Color from Image Online | Free Transparent Background Remover",
-    "h1": "Remove Color from Image",
-    "description": "Remove any color from images online. Make backgrounds transparent (white/black/green) and download high‑quality images (PNG/JPG/WebP). No signup required.",
+    "title": "Remove Color from Image Online - Free Transparent Background Tool",
+    "h1": "Remove Color from Image Online",
+    "description": "Easily remove color from image online for free. Our tool lets you make specific colors transparent, remove backgrounds, and download as PNG/WebP. No signup needed.",
     "aboutDesc": "The 'Remove Color from Image' tool lets you make any color transparent directly in your browser. Click to pick a color, adjust tolerance to include similar shades, remove multiple colors in sequence, and download as PNG or WebP to preserve transparency, or as JPG when transparency isn’t needed. All processing happens locally for privacy.",
+    "featureTitle": "Why Use Our Tool to Remove Color from Image?",
+    "featureDesc": "Our online tool is the fastest way to remove color from image without Photoshop. Whether you need to remove a solid background, extract a logo, or create transparent overlays, our AI-assisted algorithm handles it instantly. Support for PNG, JPG, and WebP formats ensures high-quality results for e-commerce, design, and social media.",
+    "useCasesTitle": "Common Use Cases for Color Removal",
+    "useCasesDesc": "• **E-commerce**: Remove background color from product photos for clean listings.\n• **Logos**: Convert JPG logos with white backgrounds to transparent PNGs.\n• **Design**: Extract specific elements by color for composite images.\n• **Photography**: Fix white balance or remove unwanted color casts from photos.",
     "howTitle": "How to Use",
     "how1": "Upload a JPG, PNG, or WebP image.",
     "how2": "Click the Original to pick the color to remove.",
