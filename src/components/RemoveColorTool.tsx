@@ -138,6 +138,9 @@ const refineAlphaMask = (data, w, h, strength) => {
     m = erode(m, w, h, rm);
     m = erode(m, w, h, 1);
     m = dilate(m, w, h, 1);
+    // Dynamic expansion based on blur radius to remove halos
+    const extra = Math.max(2, Math.floor(rb * 0.8));
+    m = dilate(m, w, h, extra);
   }
   const srcf = new Float32Array(w * h);
   for (let i = 0; i < srcf.length; i++) srcf[i] = m[i];
@@ -419,50 +422,6 @@ export default function RemoveColorTool({
       }
       let simpleManualApplied = false;
       if (manualLocals.length > 0) {
-        if (manualLocals.length === 1) {
-          const seed = manualLocals[0];
-          const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
-          const hueTol = Math.max(20, Math.round((tUse / 150) * 36));
-          // 基于种子估计简单背景：全图网格抽样命中率
-          let gHits = 0, gAll = 0;
-          const step = Math.max(8, Math.floor(Math.min(w, h) / 80));
-          for (let yy = 0; yy < h; yy += step) {
-            for (let xx = 0; xx < w; xx += step) {
-              const off = (yy * w + xx) * 4;
-              const a0 = src[off+3] ?? data[off+3];
-              if (a0 <= 8) continue;
-              const r0 = src[off], g0 = src[off+1], b0 = src[off+2];
-              const pv0 = rgbToHsv(r0,g0,b0);
-              const dh0 = hueDelta(pv0.h, seed.h);
-              // 放宽手动点击的判断标准
-              if (dh0 <= hueTol && pv0.s >= 0.05) gHits++;
-              gAll++;
-            }
-          }
-          const ratio = gAll ? gHits / gAll : 0;
-          // 只要全图有 10% 以上是该颜色，就尝试全局清除，不再局限于连通域
-          // 这样能解决“点击残留区域无法一次性清除”的问题
-          if (ratio >= 0.10) {
-            // 简单背景：一次全局清除
-            const sMin = Math.max(0, seed.s - 0.15), sMax = Math.min(1, seed.s + 0.18);
-            const vMin = Math.max(0, seed.v - 0.25), vMax = Math.min(1, seed.v + 0.25);
-            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-              const r = src[i], g = src[i+1], b = src[i+2];
-              const pv = rgbToHsv(r,g,b);
-              let ok = false;
-              if (pv.s >= minSat) {
-                const dh = hueDelta(pv.h, seed.h);
-                if (dh <= hueTol && pv.s >= sMin && pv.s <= sMax && pv.v >= vMin && pv.v <= vMax) ok = true;
-              } else {
-                const dr = r - seed.r, dg = g - seed.g, db = b - seed.b;
-                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
-                if (dist <= 60) ok = true;
-              }
-              if (ok) data[i + 3] = 0;
-            }
-            simpleManualApplied = true;
-          }
-        }
         const groups: Record<string, {seed:any, points: Array<{x:number;y:number}>}> = {};
         for (let k = 0; k < manualLocals.length; k++) {
           const s = manualLocals[k];
@@ -474,59 +433,107 @@ export default function RemoveColorTool({
         for (let gi = 0; gi < keys.length; gi++) {
           const { seed, points } = groups[keys[gi]];
           const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
-          const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
-          const sTol = (tUse / 150) * 0.35;
-          const vTol = (tUse / 150) * 0.35;
-          const visited = new Uint8Array(w * h);
-          const q = new Int32Array(w * h * 2);
-          let qi = 0, qj = 0;
-          const push = (tx: number, ty: number) => {
-            const idx = ty * w + tx;
-            if (!visited[idx]) {
-              visited[idx] = 1;
-              q[qj++] = tx;
-              q[qj++] = ty;
+          
+          // Check if this group qualifies for Global Clear
+          // Based on seed estimation: hits in grid sampling
+          const hueTolCheck = Math.max(20, Math.round((tUse / 150) * 36));
+          let gHits = 0, gAll = 0;
+          const step = Math.max(8, Math.floor(Math.min(w, h) / 80));
+          for (let yy = 0; yy < h; yy += step) {
+            for (let xx = 0; xx < w; xx += step) {
+              const off = (yy * w + xx) * 4;
+              const a0 = src[off+3] ?? data[off+3];
+              if (a0 <= 8) continue;
+              const r0 = src[off], g0 = src[off+1], b0 = src[off+2];
+              const pv0 = rgbToHsv(r0,g0,b0);
+              const dh0 = hueDelta(pv0.h, seed.h);
+              if (dh0 <= hueTolCheck && pv0.s >= 0.05) gHits++;
+              gAll++;
             }
-          };
-          for (let p = 0; p < points.length; p++) {
-            push(points[p].x, points[p].y);
           }
-          while (qi < qj) {
-            const x = q[qi++], y = q[qi++];
-            const idx = y * w + x;
-            const off = idx * 4;
-            const r = src[off], g = src[off + 1], b = src[off + 2];
-            const pv = rgbToHsv(r, g, b);
-            let matched = false;
-            if (isNeutralSat(seed.s)) {
-              const sLimit = Math.min(0.25, seed.s + (tUse / 150) * 0.20);
-              const vTolN = (tUse / 150) * 0.25 + 0.04;
-              if (pv.s <= sLimit && Math.abs(pv.v - seed.v) <= vTolN) {
-                matched = true;
-              }
-            } else {
+          const ratio = gAll ? gHits / gAll : 0;
+          
+          if (ratio >= 0.10) {
+            // Simple Background: Global Clear
+            // Use tighter tolerance for execution to avoid over-clearing similar colors (e.g. orange vs yellow)
+            const hueTolExec = Math.max(4, Math.round((tUse / 150) * 40));
+            const sTolExec = (tUse / 150) * 0.35 + 0.05;
+            const vTolExec = (tUse / 150) * 0.35 + 0.05;
+            
+            const sMin = Math.max(0, seed.s - sTolExec), sMax = Math.min(1, seed.s + sTolExec);
+            const vMin = Math.max(0, seed.v - vTolExec), vMax = Math.min(1, seed.v + vTolExec);
+            
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+              const r = src[i], g = src[i+1], b = src[i+2];
+              const pv = rgbToHsv(r,g,b);
+              let ok = false;
               if (pv.s >= minSat) {
                 const dh = hueDelta(pv.h, seed.h);
-                if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) {
+                if (dh <= hueTolExec && pv.s >= sMin && pv.s <= sMax && pv.v >= vMin && pv.v <= vMax) ok = true;
+              } else {
+                const dr = r - seed.r, dg = g - seed.g, db = b - seed.b;
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                if (dist <= 60) ok = true;
+              }
+              if (ok) data[i + 3] = 0;
+            }
+            simpleManualApplied = true;
+          } else {
+            // Complex Background: BFS
+            const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
+            const sTol = (tUse / 150) * 0.35;
+            const vTol = (tUse / 150) * 0.35;
+            const visited = new Uint8Array(w * h);
+            const q = new Int32Array(w * h * 2);
+            let qi = 0, qj = 0;
+            const push = (tx: number, ty: number) => {
+              const idx = ty * w + tx;
+              if (!visited[idx]) {
+                visited[idx] = 1;
+                q[qj++] = tx;
+                q[qj++] = ty;
+              }
+            };
+            for (let p = 0; p < points.length; p++) {
+              push(points[p].x, points[p].y);
+            }
+            while (qi < qj) {
+              const x = q[qi++], y = q[qi++];
+              const idx = y * w + x;
+              const off = idx * 4;
+              const r = src[off], g = src[off + 1], b = src[off + 2];
+              const pv = rgbToHsv(r, g, b);
+              let matched = false;
+              if (isNeutralSat(seed.s)) {
+                const sLimit = Math.min(0.25, seed.s + (tUse / 150) * 0.20);
+                const vTolN = (tUse / 150) * 0.25 + 0.04;
+                if (pv.s <= sLimit && Math.abs(pv.v - seed.v) <= vTolN) {
                   matched = true;
                 }
               } else {
-                const dr = r - (seed.r ?? 0);
-                const dg = g - (seed.g ?? 0);
-                const db = b - (seed.b ?? 0);
-                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
-                const rgbTol = 18 + (tUse / 150) * 28;
-                if (dist <= rgbTol && Math.abs(pv.v - seed.v) <= (vTol + 0.08)) {
-                  matched = true;
+                if (pv.s >= minSat) {
+                  const dh = hueDelta(pv.h, seed.h);
+                  if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) {
+                    matched = true;
+                  }
+                } else {
+                  const dr = r - (seed.r ?? 0);
+                  const dg = g - (seed.g ?? 0);
+                  const db = b - (seed.b ?? 0);
+                  const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                  const rgbTol = 18 + (tUse / 150) * 28;
+                  if (dist <= rgbTol && Math.abs(pv.v - seed.v) <= (vTol + 0.08)) {
+                    matched = true;
+                  }
                 }
               }
-            }
-            if (matched) {
-              data[off + 3] = 0;
-              if (x > 0) push(x - 1, y);
-              if (x < w - 1) push(x + 1, y);
-              if (y > 0) push(x, y - 1);
-              if (y < h - 1) push(x, y + 1);
+              if (matched) {
+                data[off + 3] = 0;
+                if (x > 0) push(x - 1, y);
+                if (x < w - 1) push(x + 1, y);
+                if (y > 0) push(x, y - 1);
+                if (y < h - 1) push(x, y + 1);
+              }
             }
           }
         }
@@ -733,7 +740,9 @@ export default function RemoveColorTool({
       if (key) {
         const [r, g, b] = key.split(',').map(Number);
         const { h, s, v } = rgbToHsv(r, g, b);
-        const autoTol = Math.max(tolerance, s <= 0.12 ? 110 : 90);
+        // Default tolerance was too aggressive (90/110 approx 20-25%). 
+        // Lowered to 45/60 (approx 10-14%) to match manual mode precision.
+        const autoTol = Math.max(tolerance, s <= 0.12 ? 60 : 45);
         // 统计边缘样本的 S/V 范围与背景占比，判定是否为“简单背景”
         const takeRange = (hBase: number) => {
           let sMin = 1, sMax = 0, vMin = 1, vMax = 0;
@@ -790,15 +799,19 @@ export default function RemoveColorTool({
         const vRangeMin = Math.max(0, Math.min(rStat.vMin, v) - 0.20);
         const vRangeMax = Math.min(1, Math.max(rStat.vMax, v) + 0.20);
           // Auto 模式：对极简背景才用“全局清除”，否则回退到“边缘连通保护”
-          // 提高阈值以避免误伤前景（如吊灯与蓝天颜色接近）
           const dominant = (rStat.ratio >= 0.8 && globalRatio >= 0.6);
           
-          // 若判定为复杂背景，收紧容差并去掉强制标记，让它走 BFS 连通保护
-          const hTolFinal = dominant ? Math.max(26, Math.round((autoTol / 150) * 40)) : 16;
-          const sRangeMinFinal = Math.max(0, Math.min(rStat.sMin, s) - (dominant ? 0.10 : 0.02));
-          const sRangeMaxFinal = Math.min(1, Math.max(rStat.sMax, s) + (dominant ? 0.12 : 0.02));
-          const vRangeMinFinal = Math.max(0, Math.min(rStat.vMin, v) - (dominant ? 0.15 : 0.05));
-          const vRangeMaxFinal = Math.min(1, Math.max(rStat.vMax, v) + (dominant ? 0.15 : 0.05));
+          // 如果是简单背景，容差也不应过大，防止误伤前景细节（如蓝天下的蓝鸟）。
+          // 之前的逻辑强制加了 26 度色相和 0.15 的亮度宽容度，这太过激进。
+          // 现在改为更保守的动态计算，信赖 rStat 统计值。
+          const hTolFinal = dominant ? Math.max(12, Math.round((autoTol / 150) * 25)) : 12;
+          const sExpand = dominant ? 0.04 : 0.02;
+          const vExpand = dominant ? 0.06 : 0.04;
+
+          const sRangeMinFinal = Math.max(0, Math.min(rStat.sMin, s) - sExpand);
+          const sRangeMaxFinal = Math.min(1, Math.max(rStat.sMax, s) + sExpand);
+          const vRangeMinFinal = Math.max(0, Math.min(rStat.vMin, v) - vExpand);
+          const vRangeMaxFinal = Math.min(1, Math.max(rStat.vMax, v) + vExpand);
           
           setTargetColors([{ 
             r, g, b, h, s, v, 
@@ -1101,7 +1114,7 @@ export default function RemoveColorTool({
                                 <input 
                                     type="range" 
                                     min="1" 
-                                    max="150" 
+                                    max="442" 
                                     value={tolerance} 
                                     onChange={(e) => setTolerance(Number(e.target.value))}
                                     onMouseEnter={(e) => showTip(e, toolText.tolTip)}
