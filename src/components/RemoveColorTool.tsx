@@ -170,6 +170,22 @@ export default function RemoveColorTool({
   const [panMode, setPanMode] = useState(false);
   const [autoRefine, setAutoRefine] = useState(true);
   const [refineStrength, setRefineStrength] = useState(40);
+  const [autoRemoving, setAutoRemoving] = useState(false);
+  const [lastAutoColor, setLastAutoColor] = useState<{r:number; g:number; b:number; hex:string} | null>(null);
+  const [tooltipState, setTooltipState] = useState<{visible: boolean; x: number; y: number; text: string}>({visible: false, x: 0, y: 0, text: ''});
+  const showTip = useCallback((e: any, text: string) => {
+    const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
+    if (!rect) return;
+    const padding = 8;
+    const maxWidth = 280;
+    let left = Math.min(rect.left, window.innerWidth - maxWidth - 12);
+    if (left < 8) left = 8;
+    const top = Math.min(rect.bottom + padding, window.innerHeight - 48);
+    setTooltipState({visible: true, x: left, y: top, text});
+  }, []);
+  const hideTip = useCallback(() => {
+    setTooltipState(prev => ({...prev, visible: false}));
+  }, []);
   
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -284,14 +300,26 @@ export default function RemoveColorTool({
                 break;
               }
             } else {
-              if (pv.s < minSat) continue;
               const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
               const sTol = (tUse / 150) * 0.35;
               const vTol = (tUse / 150) * 0.35;
-              const dh = hueDelta(pv.h, tg.h);
-              if (dh <= hueTol && Math.abs(pv.s - tg.s) <= sTol && Math.abs(pv.v - tg.v) <= vTol) {
-                hit = true;
-                break;
+              if (pv.s >= minSat) {
+                const dh = hueDelta(pv.h, tg.h);
+                if (dh <= hueTol && Math.abs(pv.s - tg.s) <= sTol && Math.abs(pv.v - tg.v) <= vTol) {
+                  hit = true;
+                  break;
+                }
+              } else {
+                // 低饱和“边沿混合像素”回退：用 RGB 距离 + 亮度接近判断
+                const dr = r - (tg.r ?? 0);
+                const dg = g - (tg.g ?? 0);
+                const db = b - (tg.b ?? 0);
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                const rgbTol = 18 + (tUse / 150) * 28; // ≈18→46
+                if (dist <= rgbTol && Math.abs(pv.v - tg.v) <= (vTol + 0.08)) {
+                  hit = true;
+                  break;
+                }
               }
             }
           }
@@ -299,9 +327,152 @@ export default function RemoveColorTool({
         }
       }
       
-      if (locals.length > 0) {
-        for (let k = 0; k < locals.length; k++) {
-          const seed = locals[k];
+      // Auto 模式：局部种子中包含 auto=true，使用“全局匹配图 + 边缘连通”一次性去除
+      const autoLocals = locals.filter(l => (l as any)?.auto === true);
+      const manualLocals = locals.filter(l => !(l as any)?.auto);
+      let simpleAutoApplied = false;
+      if (autoLocals.length > 0) {
+        const autoGroups: Record<string, any> = {};
+        for (let k = 0; k < autoLocals.length; k++) {
+          const s: any = autoLocals[k];
+          const key = `${Math.round(s.tTol||tolerance)}|${s.r}|${s.g}|${s.b}`;
+          if (!autoGroups[key]) autoGroups[key] = s;
+        }
+        const keys = Object.keys(autoGroups);
+        for (let gi = 0; gi < keys.length; gi++) {
+          const seed: any = autoGroups[keys[gi]];
+          const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
+          const hueTol = seed.hTol ?? Math.max(12, Math.round((tUse / 150) * 30));
+          const sTol = (tUse / 150) * 0.45;
+          const vTol = (tUse / 150) * 0.50;
+          const isN = isNeutralSat(seed.s);
+          const match = new Uint8Array(w * h);
+          for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            const r = src[i], g = src[i+1], b = src[i+2];
+            const pv = rgbToHsv(r,g,b);
+            let ok = false;
+            if (seed.sMin !== undefined && seed.sMax !== undefined && seed.vMin !== undefined && seed.vMax !== undefined) {
+              if (pv.s >= minSat) {
+                const dh = hueDelta(pv.h, seed.h);
+                const sMin = Math.max(0, seed.sMin - 0.02), sMax = Math.min(1, seed.sMax + 0.02);
+                const vMin = Math.max(0, seed.vMin - 0.02), vMax = Math.min(1, seed.vMax + 0.02);
+                if (dh <= hueTol && pv.s >= sMin && pv.s <= sMax && pv.v >= vMin && pv.v <= vMax) ok = true;
+              } else {
+                const dr = r - seed.r, dg = g - seed.g, db = b - seed.b;
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                if (dist <= 60) ok = true;
+              }
+            } else if (isN) {
+              const sLimit = Math.min(0.25, seed.s + (tUse / 150) * 0.20);
+              const vTolN = (tUse / 150) * 0.25 + 0.05;
+              if (pv.s <= sLimit && Math.abs(pv.v - seed.v) <= vTolN) ok = true;
+            } else {
+              if (pv.s >= minSat) {
+                const dh = hueDelta(pv.h, seed.h);
+                if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) ok = true;
+              } else {
+                const dr = r - seed.r, dg = g - seed.g, db = b - seed.b;
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                const rgbTol = 18 + (tUse / 150) * 28;
+                if (dist <= rgbTol && Math.abs(pv.v - seed.v) <= (vTol + 0.08)) ok = true;
+              }
+            }
+            if (ok) match[p] = 1;
+          }
+          if (seed.dominant) {
+            for (let p = 0, i = 0; p < match.length; p++, i += 4) {
+              if (match[p]) data[i + 3] = 0;
+            }
+            simpleAutoApplied = true;
+          } else {
+            const visited = new Uint8Array(w * h);
+            const q = new Int32Array(w * h * 2);
+            let qi = 0, qj = 0;
+            const push = (tx: number, ty: number) => {
+               const ti = ty * w + tx;
+               if (!visited[ti] && match[ti]) {
+                 visited[ti] = 1;
+                 q[qj++] = tx;
+                 q[qj++] = ty;
+               }
+            };
+            for (let x = 0; x < w; x++) {
+              push(x, 0);
+              push(x, h - 1);
+            }
+            for (let y = 1; y < h - 1; y++) {
+              push(0, y);
+              push(w - 1, y);
+            }
+            while (qi < qj) {
+              const x = q[qi++], y = q[qi++];
+              const idx = y * w + x;
+              const off = idx * 4;
+              data[off + 3] = 0;
+              if (x > 0) push(x - 1, y);
+              if (x < w - 1) push(x + 1, y);
+              if (y > 0) push(x, y - 1);
+              if (y < h - 1) push(x, y + 1);
+            }
+          }
+        }
+      }
+      let simpleManualApplied = false;
+      if (manualLocals.length > 0) {
+        if (manualLocals.length === 1) {
+          const seed = manualLocals[0];
+          const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
+          const hueTol = Math.max(20, Math.round((tUse / 150) * 36));
+          // 基于种子估计简单背景：全图网格抽样命中率
+          let gHits = 0, gAll = 0;
+          const step = Math.max(8, Math.floor(Math.min(w, h) / 80));
+          for (let yy = 0; yy < h; yy += step) {
+            for (let xx = 0; xx < w; xx += step) {
+              const off = (yy * w + xx) * 4;
+              const a0 = src[off+3] ?? data[off+3];
+              if (a0 <= 8) continue;
+              const r0 = src[off], g0 = src[off+1], b0 = src[off+2];
+              const pv0 = rgbToHsv(r0,g0,b0);
+              const dh0 = hueDelta(pv0.h, seed.h);
+              // 放宽手动点击的判断标准
+              if (dh0 <= hueTol && pv0.s >= 0.05) gHits++;
+              gAll++;
+            }
+          }
+          const ratio = gAll ? gHits / gAll : 0;
+          // 只要全图有 10% 以上是该颜色，就尝试全局清除，不再局限于连通域
+          // 这样能解决“点击残留区域无法一次性清除”的问题
+          if (ratio >= 0.10) {
+            // 简单背景：一次全局清除
+            const sMin = Math.max(0, seed.s - 0.15), sMax = Math.min(1, seed.s + 0.18);
+            const vMin = Math.max(0, seed.v - 0.25), vMax = Math.min(1, seed.v + 0.25);
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+              const r = src[i], g = src[i+1], b = src[i+2];
+              const pv = rgbToHsv(r,g,b);
+              let ok = false;
+              if (pv.s >= minSat) {
+                const dh = hueDelta(pv.h, seed.h);
+                if (dh <= hueTol && pv.s >= sMin && pv.s <= sMax && pv.v >= vMin && pv.v <= vMax) ok = true;
+              } else {
+                const dr = r - seed.r, dg = g - seed.g, db = b - seed.b;
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                if (dist <= 60) ok = true;
+              }
+              if (ok) data[i + 3] = 0;
+            }
+            simpleManualApplied = true;
+          }
+        }
+        const groups: Record<string, {seed:any, points: Array<{x:number;y:number}>}> = {};
+        for (let k = 0; k < manualLocals.length; k++) {
+          const s = manualLocals[k];
+          const key = `${Math.round(s.tTol||tolerance)}|${s.r}|${s.g}|${s.b}`;
+          if (!groups[key]) groups[key] = { seed: s, points: [] };
+          groups[key].points.push({ x: Math.min(w - 1, Math.max(0, Math.floor(s.x || 0))), y: Math.min(h - 1, Math.max(0, Math.floor(s.y || 0))) });
+        }
+        const keys = Object.keys(groups);
+        for (let gi = 0; gi < keys.length; gi++) {
+          const { seed, points } = groups[keys[gi]];
           const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
           const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
           const sTol = (tUse / 150) * 0.35;
@@ -309,14 +480,20 @@ export default function RemoveColorTool({
           const visited = new Uint8Array(w * h);
           const q = new Int32Array(w * h * 2);
           let qi = 0, qj = 0;
-          const sx = Math.min(w - 1, Math.max(0, Math.floor(seed.x || 0)));
-          const sy = Math.min(h - 1, Math.max(0, Math.floor(seed.y || 0)));
-          q[qj++] = sx; q[qj++] = sy;
+          const push = (tx: number, ty: number) => {
+            const idx = ty * w + tx;
+            if (!visited[idx]) {
+              visited[idx] = 1;
+              q[qj++] = tx;
+              q[qj++] = ty;
+            }
+          };
+          for (let p = 0; p < points.length; p++) {
+            push(points[p].x, points[p].y);
+          }
           while (qi < qj) {
             const x = q[qi++], y = q[qi++];
             const idx = y * w + x;
-            if (visited[idx]) continue;
-            visited[idx] = 1;
             const off = idx * 4;
             const r = src[off], g = src[off + 1], b = src[off + 2];
             const pv = rgbToHsv(r, g, b);
@@ -333,21 +510,119 @@ export default function RemoveColorTool({
                 if (dh <= hueTol && Math.abs(pv.s - seed.s) <= sTol && Math.abs(pv.v - seed.v) <= vTol) {
                   matched = true;
                 }
+              } else {
+                const dr = r - (seed.r ?? 0);
+                const dg = g - (seed.g ?? 0);
+                const db = b - (seed.b ?? 0);
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                const rgbTol = 18 + (tUse / 150) * 28;
+                if (dist <= rgbTol && Math.abs(pv.v - seed.v) <= (vTol + 0.08)) {
+                  matched = true;
+                }
               }
             }
             if (matched) {
               data[off + 3] = 0;
-              if (x > 0) { q[qj++] = x - 1; q[qj++] = y; }
-              if (x < w - 1) { q[qj++] = x + 1; q[qj++] = y; }
-              if (y > 0) { q[qj++] = x; q[qj++] = y - 1; }
-              if (y < h - 1) { q[qj++] = x; q[qj++] = y + 1; }
+              if (x > 0) push(x - 1, y);
+              if (x < w - 1) push(x + 1, y);
+              if (y > 0) push(x, y - 1);
+              if (y < h - 1) push(x, y + 1);
             }
           }
         }
       }
       
-      if (autoRefine && refineStrength > 0) {
-        refineAlphaMask(data, w, h, refineStrength);
+      if (globals.length > 0) {
+        const anyColor = globals.find(gm => !isNeutralSat(gm.s));
+        if (anyColor) {
+          const leftBand = Math.max(2, Math.floor(w * 0.03));
+          const rightBand = Math.max(2, Math.floor(w * 0.03));
+          const topBand = Math.max(2, Math.floor(h * 0.03));
+          const botBand = Math.max(2, Math.floor(h * 0.03));
+          const vHi = 0.85;
+          const sLo = 0.12;
+          const clearIf = (off: number) => {
+            const rr = src[off], gg = src[off + 1], bb = src[off + 2];
+            const pa = data[off + 3];
+            if (pa <= 8) return false;
+            const hv = rgbToHsv(rr, gg, bb);
+            if (hv.s <= sLo && hv.v >= vHi) { data[off + 3] = 0; return true; }
+            return false;
+          };
+          for (let y = 0; y < h; y++) {
+            let stop = 0;
+            for (let x = 0; x < leftBand; x++) {
+              const off = (y * w + x) * 4;
+              if (!clearIf(off)) { if (++stop > 6) break; } else { stop = 0; }
+            }
+            stop = 0;
+            for (let x = w - 1; x >= w - rightBand; x--) {
+              const off = (y * w + x) * 4;
+              if (!clearIf(off)) { if (++stop > 6) break; } else { stop = 0; }
+            }
+          }
+          for (let x = 0; x < w; x++) {
+            let stop = 0;
+            for (let y = 0; y < topBand; y++) {
+              const off = (y * w + x) * 4;
+              if (!clearIf(off)) { if (++stop > 6) break; } else { stop = 0; }
+            }
+            stop = 0;
+            for (let y = h - 1; y >= h - botBand; y--) {
+              const off = (y * w + x) * 4;
+              if (!clearIf(off)) { if (++stop > 6) break; } else { stop = 0; }
+            }
+          }
+        }
+        const nMask = new Uint8Array(w * h);
+        const rgbTolBase = 22 + (tolerance / 150) * 28;
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            const off = idx * 4;
+            if (data[off + 3] === 0) continue;
+            let z = 0;
+            if (data[((y)*w + (x-1))*4 + 3] === 0) z++;
+            if (data[((y)*w + (x+1))*4 + 3] === 0) z++;
+            if (data[((y-1)*w + x)*4 + 3] === 0) z++;
+            if (data[((y+1)*w + x)*4 + 3] === 0) z++;
+            if (z < 2) continue;
+            const r = src[off], g = src[off + 1], b = src[off + 2];
+            const pv = rgbToHsv(r, g, b);
+            let ok = false;
+            for (let j = 0; j < globals.length; j++) {
+              const tg = globals[j];
+              const tUse = typeof tg.tTol === 'number' ? tg.tTol : tolerance;
+              const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
+              const sTol = (tUse / 150) * 0.35;
+              const vTol = (tUse / 150) * 0.35;
+              if (isNeutralSat(tg.s) || pv.s < 0.10) {
+                const dr = r - (tg.r || 0);
+                const dg = g - (tg.g || 0);
+                const db = b - (tg.b || 0);
+                const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+                if (dist <= rgbTolBase && Math.abs(pv.v - tg.v) <= (vTol + 0.10)) { ok = true; break; }
+              } else {
+                if (pv.s >= 0.06) {
+                  const dh = hueDelta(pv.h, tg.h);
+                  if (dh <= hueTol && Math.abs(pv.s - tg.s) <= (sTol + 0.08) && Math.abs(pv.v - tg.v) <= (vTol + 0.08)) { ok = true; break; }
+                }
+              }
+            }
+            if (ok) nMask[idx] = 1;
+          }
+        }
+        for (let i = 0; i < w*h; i++) {
+          if (nMask[i]) data[i*4 + 3] = 0;
+        }
+      }
+      
+      const minEdgeStrength = 40;
+      if (autoRefine && !simpleAutoApplied && !simpleManualApplied) {
+        const eff = Math.max(refineStrength, minEdgeStrength);
+        refineAlphaMask(data, w, h, eff);
+      } else if (globals.length > 0 && !simpleAutoApplied && !simpleManualApplied) {
+        refineAlphaMask(data, w, h, minEdgeStrength);
       }
       ctx.putImageData(imageData, 0, 0);
       setIsProcessing(false);
@@ -394,57 +669,151 @@ export default function RemoveColorTool({
     setTargetColors(prev => prev.slice(0, -1));
   };
 
-  // Auto Remove Background (Improved Algorithm)
   const handleAutoRemove = () => {
     if (!originalImage) return;
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = originalImage.naturalWidth;
-    canvas.height = originalImage.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(originalImage, 0, 0);
-    
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    // Sample more pixels from edges (Top, Bottom, Left, Right)
-    // Map color string "r,g,b" to count
-    const colorCounts = {};
-    const samplePixel = (idx) => {
-        const r = imageData[idx];
-        const g = imageData[idx + 1];
-        const b = imageData[idx + 2];
-        // Quantize slightly to group similar colors (step of 5)
-        const key = `${Math.round(r/5)*5},${Math.round(g/5)*5},${Math.round(b/5)*5}`;
-        colorCounts[key] = (colorCounts[key] || 0) + 1;
-    };
+    setAutoRemoving(true);
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = originalImage.naturalWidth;
+      canvas.height = originalImage.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(originalImage, 0, 0);
+      
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const width = canvas.width;
+      const height = canvas.height;
 
-    // Top & Bottom rows
-    for (let x = 0; x < width; x+=5) { // Step 5 for performance
-        samplePixel(x * 4); // Top
-        samplePixel(((height - 1) * width + x) * 4); // Bottom
-    }
-    // Left & Right cols
-    for (let y = 0; y < height; y+=5) {
-        samplePixel((y * width) * 4); // Left
-        samplePixel((y * width + width - 1) * 4); // Right
-    }
-
-    // Find most frequent color
-    let maxCount = 0;
-    let dominantColorKey = null;
-    for (const key in colorCounts) {
-        if (colorCounts[key] > maxCount) {
-            maxCount = colorCounts[key];
-            dominantColorKey = key;
+      const qStep = 6;
+      const makeKey = (r: number, g: number, b: number) => `${Math.round(r/qStep)*qStep},${Math.round(g/qStep)*qStep},${Math.round(b/qStep)*qStep}`;
+      const countsAll: Record<string, number> = {};
+      const countsFiltered: Record<string, number> = {};
+      const addPixel = (idx: number) => {
+        const r = imageData[idx], g = imageData[idx+1], b = imageData[idx+2], a = imageData[idx+3];
+        if (a <= 8) return; // 忽略几乎透明像素
+        const key = makeKey(r,g,b);
+        countsAll[key] = (countsAll[key] || 0) + 1;
+        const { s, v } = rgbToHsv(r,g,b);
+        const nearWhite = (s <= 0.10 && v >= 0.92);
+        const nearBlack = (v <= 0.08);
+        if (!nearWhite && !nearBlack) {
+          countsFiltered[key] = (countsFiltered[key] || 0) + 1;
         }
-    }
+      };
+      // 采样四边各 3% 宽/高的条带
+      const bw = Math.max(2, Math.floor(width * 0.03));
+      const bh = Math.max(2, Math.floor(height * 0.03));
+      for (let x = 0; x < width; x += 3) {
+        for (let y = 0; y < bh; y += 2) addPixel((y*width + x) * 4); // top strip
+        for (let y = height - bh; y < height; y += 2) addPixel((y*width + x) * 4); // bottom strip
+      }
+      for (let y = 0; y < height; y += 3) {
+        for (let x = 0; x < bw; x += 2) addPixel((y*width + x) * 4); // left strip
+        for (let x = width - bw; x < width; x += 2) addPixel((y*width + x) * 4); // right strip
+      }
+      // 再采样内缩 5% 的内圈条带（避免图片白边）
+      const ix = Math.max(2, Math.floor(width * 0.05));
+      const iy = Math.max(2, Math.floor(height * 0.05));
+      for (let x = ix; x < width - ix; x += 4) {
+        addPixel((iy*width + x) * 4);
+        addPixel(((height - 1 - iy)*width + x) * 4);
+      }
+      for (let y = iy; y < height - iy; y += 4) {
+        addPixel((y*width + ix) * 4);
+        addPixel((y*width + (width - 1 - ix)) * 4);
+      }
 
-    if (dominantColorKey) {
-        const [r, g, b] = dominantColorKey.split(',').map(Number);
+      const pickFrom = (store: Record<string, number>) => {
+        let maxKey: string | null = null, maxVal = 0;
+        for (const k in store) { if (store[k] > maxVal) { maxVal = store[k]; maxKey = k; } }
+        return maxKey;
+      };
+      // 首选“过滤后的”统计，回退到“全部”的统计
+      let key = pickFrom(countsFiltered);
+      if (!key) key = pickFrom(countsAll);
+      if (key) {
+        const [r, g, b] = key.split(',').map(Number);
         const { h, s, v } = rgbToHsv(r, g, b);
-        setTargetColors(prev => [...prev, { r, g, b, h, s, v, mode: 'global', tTol: tolerance }]);
+        const autoTol = Math.max(tolerance, s <= 0.12 ? 110 : 90);
+        // 统计边缘样本的 S/V 范围与背景占比，判定是否为“简单背景”
+        const takeRange = (hBase: number) => {
+          let sMin = 1, sMax = 0, vMin = 1, vMax = 0;
+          let hits = 0, total = 0;
+          const hueTolR = 26;
+          const sample = (idx: number) => {
+            const a = imageData[idx+3];
+            if (a <= 8) return;
+            total++;
+            const r0 = imageData[idx], g0 = imageData[idx+1], b0 = imageData[idx+2];
+            const pv0 = rgbToHsv(r0,g0,b0);
+            const dh = hueDelta(pv0.h, hBase);
+            if (dh <= hueTolR) {
+              hits++;
+              sMin = Math.min(sMin, pv0.s);
+              sMax = Math.max(sMax, pv0.s);
+              vMin = Math.min(vMin, pv0.v);
+              vMax = Math.max(vMax, pv0.v);
+            }
+          };
+          const bw = Math.max(2, Math.floor(width * 0.03));
+          const bh = Math.max(2, Math.floor(height * 0.03));
+          for (let x = 0; x < width; x += 3) {
+            for (let y = 0; y < bh; y += 2) sample((y*width + x) * 4);
+            for (let y = height - bh; y < height; y += 2) sample((y*width + x) * 4);
+          }
+          for (let y = 0; y < height; y += 3) {
+            for (let x = 0; x < bw; x += 2) sample((y*width + x) * 4);
+            for (let x = width - bw; x < width; x += 2) sample((y*width + x) * 4);
+          }
+          return { sMin, sMax, vMin, vMax, ratio: total ? hits/total : 0 };
+        };
+        const rStat = takeRange(h);
+        // 近似全图覆盖率（网格抽样）
+        let gHits = 0, gAll = 0;
+        const step = Math.max(8, Math.floor(Math.min(width, height) / 80));
+        const hueTolR2 = 26;
+        for (let yy = 0; yy < height; yy += step) {
+          for (let xx = 0; xx < width; xx += step) {
+            const off = (yy * width + xx) * 4;
+            const a0 = imageData[off+3];
+            if (a0 <= 8) continue;
+            const r0 = imageData[off], g0 = imageData[off+1], b0 = imageData[off+2];
+            const pv0 = rgbToHsv(r0,g0,b0);
+            gAll++;
+            const dh0 = hueDelta(pv0.h, h);
+            if (dh0 <= hueTolR2 && pv0.s >= 0.05) gHits++;
+          }
+        }
+        const globalRatio = gAll ? gHits / gAll : 0;
+        // 放宽范围以覆盖天空渐变
+        const sRangeMin = Math.max(0, Math.min(rStat.sMin, s) - 0.12);
+        const sRangeMax = Math.min(1, Math.max(rStat.sMax, s) + 0.15);
+        const vRangeMin = Math.max(0, Math.min(rStat.vMin, v) - 0.20);
+        const vRangeMax = Math.min(1, Math.max(rStat.vMax, v) + 0.20);
+          // Auto 模式：对极简背景才用“全局清除”，否则回退到“边缘连通保护”
+          // 提高阈值以避免误伤前景（如吊灯与蓝天颜色接近）
+          const dominant = (rStat.ratio >= 0.8 && globalRatio >= 0.6);
+          
+          // 若判定为复杂背景，收紧容差并去掉强制标记，让它走 BFS 连通保护
+          const hTolFinal = dominant ? Math.max(26, Math.round((autoTol / 150) * 40)) : 16;
+          const sRangeMinFinal = Math.max(0, Math.min(rStat.sMin, s) - (dominant ? 0.10 : 0.02));
+          const sRangeMaxFinal = Math.min(1, Math.max(rStat.sMax, s) + (dominant ? 0.12 : 0.02));
+          const vRangeMinFinal = Math.max(0, Math.min(rStat.vMin, v) - (dominant ? 0.15 : 0.05));
+          const vRangeMaxFinal = Math.min(1, Math.max(rStat.vMax, v) + (dominant ? 0.15 : 0.05));
+          
+          setTargetColors([{ 
+            r, g, b, h, s, v, 
+            mode: 'local', 
+            tTol: autoTol, 
+            auto: true, 
+            sMin: sRangeMinFinal, sMax: sRangeMaxFinal, 
+            vMin: vRangeMinFinal, vMax: vRangeMaxFinal, 
+            dominant, // 仅在非常确信是简单背景时才为 true
+            hTol: hTolFinal 
+          } as any]);
+        setLastAutoColor(null);
+      }
+    } finally {
+      setAutoRemoving(false);
     }
   };
 
@@ -485,6 +854,7 @@ export default function RemoveColorTool({
     
     const { h, s, v } = rgbToHsv(r, g, b);
     setTargetColors(prev => [...prev, { r, g, b, x: Math.floor(x), y: Math.floor(y), h, s, v, mode: 'local', tTol: tolerance }]);
+    if (showGuide) setShowGuide(false);
   };
 
   const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
@@ -617,6 +987,21 @@ export default function RemoveColorTool({
     }
   };
 
+  const [showGuide, setShowGuide] = useState(false);
+  useEffect(() => {
+    if (!imageSrc) {
+      setShowGuide(false);
+      return;
+    }
+    if (targetColors.length === 0) {
+      setShowGuide(true);
+      const id = setTimeout(() => setShowGuide(false), 3000);
+      return () => clearTimeout(id);
+    } else {
+      setShowGuide(false);
+    }
+  }, [imageSrc, targetColors.length]);
+
   return (
     <>
       <Header locale={locale} page={pageName} />
@@ -696,63 +1081,60 @@ export default function RemoveColorTool({
                 ) : (
                   <div className="w-full flex flex-col gap-6">
                      {/* Toolbar */}
-                     <div ref={workspaceToolbarRef} className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-4 rounded-xl shadow-md border border-slate-200 sticky top-24 z-10">
-                        <div className="flex flex-wrap items-center gap-4">
+                     <div ref={workspaceToolbarRef} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl shadow-md border border-slate-200 sticky top-24 z-[60] flex-nowrap overflow-x-hidden overflow-y-visible whitespace-nowrap min-h-[56px]">
+                        <div className="flex items-center gap-3 flex-nowrap">
                             <button
                                 onClick={handleAutoRemove}
-                                className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-100"
+                                disabled={!originalImage || autoRemoving}
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold shrink-0 ${autoRemoving ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-60'}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
                                 </svg>
-                                Auto Remove BG
+                                {autoRemoving ? 'Auto Removing…' : 'Auto Remove BG'}
                             </button>
+                            {/* 检测到的背景色徽标已关闭以保证工具条稳定布局 */}
                             
-                            <div className="flex items-center gap-2 border-l pl-4 border-slate-200 relative group">
-                                <span className="text-sm font-medium text-gray-700">Tolerance: {Math.round((tolerance / 442) * 100)}%</span>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" />
-                                <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-20 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 px-3 py-2">
-                                  <span className="text-xs text-gray-700">{toolText.tolTip}</span>
-                                </div>
+                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200 relative whitespace-nowrap shrink-0">
+                                <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[96px] sm:min-w-[110px] md:min-w-[120px]" style={{fontVariantNumeric:'tabular-nums'}}>Tolerance: {Math.round((tolerance / 442) * 100)}%</span>
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.tolTip)} onMouseLeave={hideTip} />
                                 <input 
                                     type="range" 
                                     min="1" 
                                     max="150" 
                                     value={tolerance} 
                                     onChange={(e) => setTolerance(Number(e.target.value))}
-                                    className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    onMouseEnter={(e) => showTip(e, toolText.tolTip)}
+                                    onMouseLeave={hideTip}
+                                    className="w-24 sm:w-28 md:w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 shrink-0 focus:outline-none focus-visible:outline-none"
                                 />
                             </div>
-                            <div className="flex items-center gap-2 border-l pl-4 border-slate-200 relative group">
-                                <span className="text-sm font-medium text-gray-700">Refine: {refineStrength}%</span>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" />
-                                <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-20 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 px-3 py-2">
-                                  <span className="text-xs text-gray-700">{toolText.refineTip}</span>
-                                </div>
+                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200 relative whitespace-nowrap shrink-0">
+                                <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[88px] sm:min-w-[100px]" style={{fontVariantNumeric:'tabular-nums'}}>Refine: {refineStrength}%</span>
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.refineTip)} onMouseLeave={hideTip} />
                                 <input
                                     type="range"
                                     min="0"
                                     max="100"
                                     value={refineStrength}
                                     onChange={(e) => setRefineStrength(Number(e.target.value))}
-                                    className="w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    onMouseEnter={(e) => showTip(e, toolText.refineTip)}
+                                    onMouseLeave={hideTip}
+                                    className="w-20 sm:w-24 md:w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 shrink-0 focus:outline-none focus-visible:outline-none"
                                 />
                                 <button
                                   onClick={() => setAutoRefine(!autoRefine)}
-                                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${autoRefine ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-600'}`}
+                                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${autoRefine ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-600'} shrink-0`}
                                 >
-                                  {autoRefine ? 'Auto Refine On' : 'Auto Refine Off'}
+                                  Auto Refine
                                 </button>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" />
-                                <div className="absolute top-full left-0 mt-1 hidden group-hover:block z-20 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 px-3 py-2">
-                                  <span className="text-xs text-gray-700">{toolText.autoRefineTip}</span>
-                                </div>
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.autoRefineTip)} onMouseLeave={hideTip} />
                             </div>
 
                             <button
                                 onClick={handleUndo}
                                 disabled={targetColors.length === 0}
-                                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path fillRule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
@@ -763,21 +1145,29 @@ export default function RemoveColorTool({
                             <button
                               onClick={handleResetEdits}
                               disabled={targetColors.length === 0}
-                              className="rounded-full px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                              className="rounded-full px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50 shrink-0"
                             >
                               Reset Edits
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2"></div>
+                        
                      </div>
+                     {tooltipState.visible && (
+                      <div
+                        className="fixed z-[200] pointer-events-none rounded-md bg-white shadow-lg ring-1 ring-black/10 px-3 py-2 text-xs text-gray-700 max-w-[280px] whitespace-normal break-words"
+                        style={{ top: tooltipState.y, left: tooltipState.x }}
+                      >
+                        {tooltipState.text}
+                      </div>
+                     )}
 
                      {/* Split View Area */}
                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                         {/* Original Image (Clickable) */}
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-semibold text-gray-900">Original (Click to remove color)</h3>
+                              <h3 className="text-sm font-semibold text-gray-900">Original (Compare only)</h3>
                               <div className="flex items-center">
                                 <button
                                   onClick={handleNewImage}
@@ -787,18 +1177,14 @@ export default function RemoveColorTool({
                                 </button>
                               </div>
                             </div>
-                            <div className="relative w-full overflow-hidden rounded-lg bg-gray-200 border border-gray-300 shadow-sm group">
+                            <div className="relative w-full overflow-hidden rounded-lg checkerboard border border-gray-300 shadow-sm group">
                                 <img 
                                     ref={originalImageRef}
                                     src={imageSrc} 
                                     alt="Original" 
-                                    className="w-full h-auto cursor-crosshair"
-                                    onClick={handleOriginalClick}
+                                    className="w-full h-auto cursor-default select-none"
                                 />
-                                <div className="absolute inset-0 pointer-events-none bg-black/0 group-hover:bg-black/5 transition-colors" />
-                                <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                    Click to pick color
-                                </div>
+                                <div className="absolute top-2 right-2 bg-gray-800/80 text-white text-[10px] px-2 py-1 rounded pointer-events-none">Compare only</div>
                             </div>
                         </div>
 
@@ -867,10 +1253,17 @@ export default function RemoveColorTool({
                               </div>
                             </div>
                             <div
-                              className="relative w-full overflow-hidden rounded-lg bg-[url('/transparent-bg.png')] bg-repeat border border-gray-300 shadow-sm group"
-                              style={{backgroundImage: 'conic-gradient(#eee 25%, white 0 25%, white 50%, #eee 0 50%, #eee 75%, white 0 75%, white)', backgroundSize: '20px 20px', overscrollBehavior: 'contain'}}
+                              className="relative w-full overflow-hidden rounded-lg checkerboard border border-gray-300 shadow-sm group"
+                              style={{ overscrollBehavior: 'contain' }}
                               ref={resultContainerRef}
                             >
+                                {showGuide && (
+                                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="rounded-full bg-[#0071e3] text-white text-xs px-3 py-2 shadow-md">
+                                      Click background to remove
+                                    </div>
+                                  </div>
+                                )}
                                 <div
                                   ref={controlsBarRef}
                                   className="z-20 flex items-center gap-2 bg-slate-100/90 backdrop-blur rounded-full px-2 py-1 border border-slate-300 shadow-md"
