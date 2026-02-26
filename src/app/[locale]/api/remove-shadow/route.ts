@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     const replicate = getReplicateClient();
-    const output: any = await replicate.run(modelRun, {
+    const output: any = await replicate.run(modelRun as any, {
       input: { image: imageDataUrl }
     });
 

@@ -8,7 +8,11 @@ import Script from "next/script";
 import { Menu, Transition } from "@headlessui/react";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
-import { QuestionMarkCircleIcon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
+import ComparisonSlider from "./ComparisonSlider";
+
+
+
 
 // Helper: Calculate color distance
 const colorDistance = (r1, g1, b1, r2, g2, b2) => {
@@ -158,6 +162,51 @@ export default function RemoveColorTool({
   toolText
 }) {
   const { setShowLoadingModal } = useCommonContext();
+
+  const SAMPLES = [
+    {
+      id: 'bird',
+      title: pageText.sample1Title || 'Bird Background Removal',
+      desc: pageText.sample1Desc || 'Automatically remove the blue sky background to isolate the bird.',
+      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
+      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-result.png',
+      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
+      settings: {
+        tolerance: 11,
+        refineStrength: 40,
+        autoRefine: true,
+        targetColors: [] // Empty means auto remove
+      }
+    },
+    {
+      id: 'building',
+      title: pageText.sample2Title || 'Building Sky Replacement',
+      desc: pageText.sample2Desc || 'Clear the blue sky behind the building for easy sky replacement.',
+      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg',
+      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-result.png',
+      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg',
+      settings: {
+        tolerance: 11,
+        refineStrength: 40,
+        autoRefine: true,
+        targetColors: [] // Empty means auto remove
+      }
+    },
+    {
+      id: 'rainbow',
+      title: pageText.sample3Title || 'Specific Color Eraser',
+      desc: pageText.sample3Desc || 'Selectively remove only the green color from the rainbow ring.',
+      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-original.jpg',
+      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-result.png',
+      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-original.jpg',
+      settings: {
+        tolerance: 30,
+        refineStrength: 40,
+        autoRefine: true,
+        targetColors: [{ r: 0, g: 255, b: 0, mode: 'global', tTol: 20 }] // Placeholder for green, actual color will be picked by user or auto logic if improved
+      }
+    }
+  ];
   
   // State
   const [imageSrc, setImageSrc] = useState(null);
@@ -175,6 +224,20 @@ export default function RemoveColorTool({
   const [refineStrength, setRefineStrength] = useState(40);
   const [autoRemoving, setAutoRemoving] = useState(false);
   const [lastAutoColor, setLastAutoColor] = useState<{r:number; g:number; b:number; hex:string} | null>(null);
+  
+  // Debounced values for processing
+  const [debouncedTolerance, setDebouncedTolerance] = useState(tolerance);
+  const [debouncedRefineStrength, setDebouncedRefineStrength] = useState(refineStrength);
+
+  // Debounce effect for tolerance and refineStrength
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTolerance(tolerance);
+      setDebouncedRefineStrength(refineStrength);
+    }, 150); // 150ms delay to improve slider performance
+    return () => clearTimeout(handler);
+  }, [tolerance, refineStrength]);
+
   const [tooltipState, setTooltipState] = useState<{visible: boolean; x: number; y: number; text: string}>({visible: false, x: 0, y: 0, text: ''});
   const showTip = useCallback((e: any, text: string) => {
     const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect?.();
@@ -194,20 +257,56 @@ export default function RemoveColorTool({
   const fileInputRef = useRef(null);
   // Ref for original image click handling
   const originalImageRef = useRef(null);
-  const resultContainerRef = useRef(null);
+  const workspaceRef = useRef(null);
   const controlsBarRef = useRef(null);
   const workspaceToolbarRef = useRef(null);
+  const howToUseRef = useRef(null);
+  const samplesRef = useRef(null);
   const [controlsAffixed, setControlsAffixed] = useState(false);
   const [controlsAffixPos, setControlsAffixPos] = useState({ top: 0, left: 0 });
-  const loadSample = (url) => {
+  const loadSample = (sample) => {
+    setIsProcessing(true);
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       setOriginalImage(img);
-      setImageSrc(url);
-      setTargetColors([]);
+      setImageSrc(sample.url);
+      
+      if (sample.settings) {
+        setTolerance(sample.settings.tolerance ?? 50);
+        setRefineStrength(sample.settings.refineStrength ?? 40);
+        setAutoRefine(sample.settings.autoRefine ?? true);
+        
+        const targets = (sample.settings.targetColors || []).map(t => {
+            const { h, s, v } = rgbToHsv(t.r, t.g, t.b);
+            return { ...t, h, s, v };
+        });
+        setTargetColors(targets);
+      } else {
+        setTargetColors([]);
+      }
+      
+      setIsProcessing(false);
+      
+      // Scroll to workspace with better positioning
+      setTimeout(() => {
+        if (workspaceRef.current) {
+            const yOffset = -80; // Offset for fixed header
+            const element = workspaceRef.current;
+            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            window.scrollTo({top: y, behavior: 'smooth'});
+        }
+      }, 100);
     };
-    img.src = url;
+    
+    img.onerror = (e) => {
+        console.error("Failed to load sample image", e);
+        setIsProcessing(false);
+        alert("Failed to load sample image. Please check your network or try again.");
+    };
+    
+    // Add timestamp to bypass browser cache and force CORS check
+    img.src = sample.url + (sample.url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
   };
 
   // Reset loading modal on mount
@@ -215,15 +314,7 @@ export default function RemoveColorTool({
     setShowLoadingModal(false);
   }, [setShowLoadingModal]);
 
-  // Handle File Upload
-  const handleUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
-
-  const processFile = (file) => {
+  const processFile = useCallback((file) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -233,6 +324,14 @@ export default function RemoveColorTool({
       // Initialize canvas (will be drawn by effect)
     };
     img.src = url;
+  }, []);
+
+  // Handle File Upload
+  const handleUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
   };
 
   const handleDrop = (e) => {
@@ -249,9 +348,35 @@ export default function RemoveColorTool({
     e.stopPropagation();
   };
 
+  // Handle Paste from Clipboard
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) processFile(file);
+          break;
+        }
+      }
+    };
+    
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [processFile]);
+
   // The Core Removal Function
   const processRemoval = useCallback(() => {
     if (!originalImage || !canvasRef.current) return;
+
+    // Use debounced values for calculation
+    const calcTolerance = debouncedTolerance;
+    const calcRefineStrength = debouncedRefineStrength;
 
     if (targetColors.length === 0) {
         const canvas = canvasRef.current;
@@ -294,7 +419,7 @@ export default function RemoveColorTool({
           let hit = false;
           for (let j = 0; j < globals.length; j++) {
             const tg = globals[j];
-            const tUse = typeof tg.tTol === 'number' ? tg.tTol : tolerance;
+            const tUse = typeof tg.tTol === 'number' ? tg.tTol : calcTolerance;
             if (isNeutralSat(tg.s)) {
               const sLimit = Math.min(0.25, tg.s + (tUse / 150) * 0.20);
               const vTol = (tUse / 150) * 0.25 + 0.04;
@@ -338,13 +463,13 @@ export default function RemoveColorTool({
         const autoGroups: Record<string, any> = {};
         for (let k = 0; k < autoLocals.length; k++) {
           const s: any = autoLocals[k];
-          const key = `${Math.round(s.tTol||tolerance)}|${s.r}|${s.g}|${s.b}`;
+          const key = `${Math.round(s.tTol||calcTolerance)}|${s.r}|${s.g}|${s.b}`;
           if (!autoGroups[key]) autoGroups[key] = s;
         }
         const keys = Object.keys(autoGroups);
         for (let gi = 0; gi < keys.length; gi++) {
           const seed: any = autoGroups[keys[gi]];
-          const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
+          const tUse = typeof seed.tTol === 'number' ? seed.tTol : calcTolerance;
           const hueTol = seed.hTol ?? Math.max(12, Math.round((tUse / 150) * 30));
           const sTol = (tUse / 150) * 0.45;
           const vTol = (tUse / 150) * 0.50;
@@ -425,14 +550,14 @@ export default function RemoveColorTool({
         const groups: Record<string, {seed:any, points: Array<{x:number;y:number}>}> = {};
         for (let k = 0; k < manualLocals.length; k++) {
           const s = manualLocals[k];
-          const key = `${Math.round(s.tTol||tolerance)}|${s.r}|${s.g}|${s.b}`;
+          const key = `${Math.round(s.tTol||calcTolerance)}|${s.r}|${s.g}|${s.b}`;
           if (!groups[key]) groups[key] = { seed: s, points: [] };
           groups[key].points.push({ x: Math.min(w - 1, Math.max(0, Math.floor(s.x || 0))), y: Math.min(h - 1, Math.max(0, Math.floor(s.y || 0))) });
         }
         const keys = Object.keys(groups);
         for (let gi = 0; gi < keys.length; gi++) {
           const { seed, points } = groups[keys[gi]];
-          const tUse = typeof seed.tTol === 'number' ? seed.tTol : tolerance;
+          const tUse = typeof seed.tTol === 'number' ? seed.tTol : calcTolerance;
           
           // Check if this group qualifies for Global Clear
           // Based on seed estimation: hits in grid sampling
@@ -582,7 +707,7 @@ export default function RemoveColorTool({
           }
         }
         const nMask = new Uint8Array(w * h);
-        const rgbTolBase = 22 + (tolerance / 150) * 28;
+        const rgbTolBase = 22 + (calcTolerance / 150) * 28;
         for (let y = 1; y < h - 1; y++) {
           for (let x = 1; x < w - 1; x++) {
             const idx = y * w + x;
@@ -599,7 +724,7 @@ export default function RemoveColorTool({
             let ok = false;
             for (let j = 0; j < globals.length; j++) {
               const tg = globals[j];
-              const tUse = typeof tg.tTol === 'number' ? tg.tTol : tolerance;
+              const tUse = typeof tg.tTol === 'number' ? tg.tTol : calcTolerance;
               const hueTol = Math.max(4, Math.round((tUse / 150) * 40));
               const sTol = (tUse / 150) * 0.35;
               const vTol = (tUse / 150) * 0.35;
@@ -626,7 +751,7 @@ export default function RemoveColorTool({
       
       const minEdgeStrength = 40;
       if (autoRefine && !simpleAutoApplied && !simpleManualApplied) {
-        const eff = Math.max(refineStrength, minEdgeStrength);
+        const eff = Math.max(calcRefineStrength, minEdgeStrength);
         refineAlphaMask(data, w, h, eff);
       } else if (globals.length > 0 && !simpleAutoApplied && !simpleManualApplied) {
         refineAlphaMask(data, w, h, minEdgeStrength);
@@ -634,14 +759,14 @@ export default function RemoveColorTool({
       ctx.putImageData(imageData, 0, 0);
       setIsProcessing(false);
     });
-  }, [originalImage, targetColors, tolerance, autoRefine, refineStrength]);
+  }, [originalImage, targetColors, debouncedTolerance, autoRefine, debouncedRefineStrength]);
 
   // Trigger processing when tolerance or target colors change
   useEffect(() => {
     if (originalImage) {
       processRemoval();
     }
-  }, [targetColors, tolerance, processRemoval, originalImage]);
+  }, [targetColors, debouncedTolerance, debouncedRefineStrength, processRemoval, originalImage]);
 
 
   // Handle Click on Original Image (Pick Color)
@@ -740,89 +865,26 @@ export default function RemoveColorTool({
       if (key) {
         const [r, g, b] = key.split(',').map(Number);
         const { h, s, v } = rgbToHsv(r, g, b);
-        // Default tolerance was too aggressive (90/110 approx 20-25%). 
-        // Lowered to 45/60 (approx 10-14%) to match manual mode precision.
-        const autoTol = Math.max(tolerance, s <= 0.12 ? 60 : 45);
-        // 统计边缘样本的 S/V 范围与背景占比，判定是否为“简单背景”
-        const takeRange = (hBase: number) => {
-          let sMin = 1, sMax = 0, vMin = 1, vMax = 0;
-          let hits = 0, total = 0;
-          const hueTolR = 26;
-          const sample = (idx: number) => {
-            const a = imageData[idx+3];
-            if (a <= 8) return;
-            total++;
-            const r0 = imageData[idx], g0 = imageData[idx+1], b0 = imageData[idx+2];
-            const pv0 = rgbToHsv(r0,g0,b0);
-            const dh = hueDelta(pv0.h, hBase);
-            if (dh <= hueTolR) {
-              hits++;
-              sMin = Math.min(sMin, pv0.s);
-              sMax = Math.max(sMax, pv0.s);
-              vMin = Math.min(vMin, pv0.v);
-              vMax = Math.max(vMax, pv0.v);
-            }
-          };
-          const bw = Math.max(2, Math.floor(width * 0.03));
-          const bh = Math.max(2, Math.floor(height * 0.03));
-          for (let x = 0; x < width; x += 3) {
-            for (let y = 0; y < bh; y += 2) sample((y*width + x) * 4);
-            for (let y = height - bh; y < height; y += 2) sample((y*width + x) * 4);
-          }
-          for (let y = 0; y < height; y += 3) {
-            for (let x = 0; x < bw; x += 2) sample((y*width + x) * 4);
-            for (let x = width - bw; x < width; x += 2) sample((y*width + x) * 4);
-          }
-          return { sMin, sMax, vMin, vMax, ratio: total ? hits/total : 0 };
-        };
-        const rStat = takeRange(h);
-        // 近似全图覆盖率（网格抽样）
-        let gHits = 0, gAll = 0;
-        const step = Math.max(8, Math.floor(Math.min(width, height) / 80));
-        const hueTolR2 = 26;
-        for (let yy = 0; yy < height; yy += step) {
-          for (let xx = 0; xx < width; xx += step) {
-            const off = (yy * width + xx) * 4;
-            const a0 = imageData[off+3];
-            if (a0 <= 8) continue;
-            const r0 = imageData[off], g0 = imageData[off+1], b0 = imageData[off+2];
-            const pv0 = rgbToHsv(r0,g0,b0);
-            gAll++;
-            const dh0 = hueDelta(pv0.h, h);
-            if (dh0 <= hueTolR2 && pv0.s >= 0.05) gHits++;
-          }
-        }
-        const globalRatio = gAll ? gHits / gAll : 0;
-        // 放宽范围以覆盖天空渐变
-        const sRangeMin = Math.max(0, Math.min(rStat.sMin, s) - 0.12);
-        const sRangeMax = Math.min(1, Math.max(rStat.sMax, s) + 0.15);
-        const vRangeMin = Math.max(0, Math.min(rStat.vMin, v) - 0.20);
-        const vRangeMax = Math.min(1, Math.max(rStat.vMax, v) + 0.20);
-          // Auto 模式：对极简背景才用“全局清除”，否则回退到“边缘连通保护”
-          const dominant = (rStat.ratio >= 0.8 && globalRatio >= 0.6);
-          
-          // 如果是简单背景，容差也不应过大，防止误伤前景细节（如蓝天下的蓝鸟）。
-          // 之前的逻辑强制加了 26 度色相和 0.15 的亮度宽容度，这太过激进。
-          // 现在改为更保守的动态计算，信赖 rStat 统计值。
-          const hTolFinal = dominant ? Math.max(12, Math.round((autoTol / 150) * 25)) : 12;
-          const sExpand = dominant ? 0.04 : 0.02;
-          const vExpand = dominant ? 0.06 : 0.04;
-
-          const sRangeMinFinal = Math.max(0, Math.min(rStat.sMin, s) - sExpand);
-          const sRangeMaxFinal = Math.min(1, Math.max(rStat.sMax, s) + sExpand);
-          const vRangeMinFinal = Math.max(0, Math.min(rStat.vMin, v) - vExpand);
-          const vRangeMaxFinal = Math.min(1, Math.max(rStat.vMax, v) + vExpand);
-          
-          setTargetColors([{ 
-            r, g, b, h, s, v, 
-            mode: 'local', 
-            tTol: autoTol, 
-            auto: true, 
-            sMin: sRangeMinFinal, sMax: sRangeMaxFinal, 
-            vMin: vRangeMinFinal, vMax: vRangeMaxFinal, 
-            dominant, // 仅在非常确信是简单背景时才为 true
-            hTol: hTolFinal 
-          } as any]);
+        
+        // AUTO MODE OPTIMIZATION
+        // Previous Logic: Aggressive tolerance (60 or 45) + complex range expansion + "dominant" mode
+        // New Logic: Mimic MANUAL mode behavior as requested by user.
+        // 1. Use standard manual tolerance (approx 20% ~ 30/150) as base
+        // 2. Disable "dominant" mode by default to prevent over-clearing foreground (birds, etc.)
+        // 3. Use standard point-seed logic instead of range-based clearing
+        
+        // Create a standard point-seed entry, similar to a manual click
+        // Note: tTol is NOT set, so it binds to the global 'tolerance' slider
+        setTargetColors([{ 
+          r, g, b, h, s, v, 
+          mode: 'local', 
+          auto: true,
+          // Explicitly disable aggressive "dominant" range clearing
+          dominant: false, 
+          sMin: undefined, sMax: undefined, 
+          vMin: undefined, vMax: undefined
+        } as any]);
+        
         setLastAutoColor(null);
       }
     } finally {
@@ -893,7 +955,7 @@ export default function RemoveColorTool({
     handleZoom(factor, e);
   };
   useEffect(() => {
-    const el = resultContainerRef.current;
+    const el = workspaceRef.current;
     if (!el) return;
     const listener = (ev) => {
       ev.preventDefault();
@@ -908,7 +970,7 @@ export default function RemoveColorTool({
   useEffect(() => {
     const onScroll = () => {
       const toolbarEl = workspaceToolbarRef.current;
-      const containerEl = resultContainerRef.current;
+      const containerEl = workspaceRef.current;
       const barEl = controlsBarRef.current;
       if (!toolbarEl || !containerEl || !barEl) return;
       const toolbarRect = toolbarEl.getBoundingClientRect();
@@ -1018,7 +1080,7 @@ export default function RemoveColorTool({
   return (
     <>
       <Header locale={locale} page={pageName} />
-      <main className="isolate bg-white">
+      <main className="isolate bg-slate-50">
         <Script id="remove-color-ld" type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -1034,19 +1096,49 @@ export default function RemoveColorTool({
         </Script>
         {/* Tool Section */}
         <div className="relative pt-32 pb-16">
+           <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
+             <div
+               className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+               style={{
+                 clipPath:
+                   'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
+               }}
+             />
+           </div>
            <div className="mx-auto max-w-7xl px-6 lg:px-8">
-             <div className="mx-auto max-w-2xl text-center mb-10">
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
+             <div className="mx-auto max-w-5xl text-center mb-10">
+                <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:whitespace-nowrap">
                   {pageText.h1}
                 </h1>
-                <p className="mt-6 text-lg leading-8 text-gray-600">
+                <p className="mt-6 text-lg leading-8 text-slate-600">
                   {pageText.description}
                 </p>
+                
+                {/* Action Buttons */}
+                <div className="mt-8 flex items-center justify-center gap-x-6">
+                  <button
+                    onClick={() => samplesRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    className="rounded-full bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-300"
+                  >
+                    {pageText.seeSamplesBtn || 'See Samples'}
+                  </button>
+                  <button
+                    onClick={() => howToUseRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                    className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all duration-300"
+                  >
+                    {pageText.howToUseBtn || 'Learn How to Use'}
+                  </button>
+                </div>
              </div>
 
              {/* Workspace */}
              <div 
-                className={`mx-auto max-w-[90rem] bg-gray-50 rounded-3xl border border-gray-200 p-4 lg:p-8 min-h-[420px] flex flex-col items-center justify-center ${!imageSrc ? 'border-dashed border-4 border-gray-300 cursor-pointer' : ''}`}
+                ref={workspaceRef}
+                className={`mx-auto flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${
+                    !imageSrc 
+                        ? 'max-w-3xl bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-8 cursor-pointer hover:shadow-2xl' 
+                        : 'max-w-[90rem] bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-4 lg:p-8 min-h-[420px]'
+                }`}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onClick={() => { if (!imageSrc) fileInputRef.current?.click() }}
@@ -1054,52 +1146,45 @@ export default function RemoveColorTool({
                 {!imageSrc ? (
                   <div className="w-full max-w-2xl mx-auto">
                     <div
-                      className="relative flex flex-col items-center justify-center gap-3 p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors"
+                      className="relative flex flex-col items-center justify-center gap-8 p-12 md:p-20 rounded-3xl border-2 border-dashed border-slate-300 hover:border-primary-400 hover:bg-white/50 transition-all duration-300 group overflow-hidden bg-white/30"
                     >
-                      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-indigo-50 text-indigo-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M.5 9.9a.5.5 0 0 1 .5-.5h3.5v-3.5a.5.5 0 0 1 1 0v3.5H9.5a.5.5 0 0 1 0 1H5.5v3.5a.5.5 0 0 1-1 0V10.9H1a.5.5 0 0 1-.5-.5"/>
-                          <path d="M4.5 0A1.5 1.5 0 0 1 6 1.5V4h4a2 2 0 0 1 2 2v6.5A1.5 1.5 0 0 1 10.5 14h-7A1.5 1.5 0 0 1 2 12.5V1.5A1.5 1.5 0 0 1 3.5 0h1z"/>
-                        </svg>
+                      {/* Decorative Background Pattern */}
+                      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+                           style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
                       </div>
-                      <div className="text-center">
-                        <p className="text-sm text-gray-600">{toolText.uploadDesc}</p>
+
+                      <div className="relative z-10 flex flex-col items-center gap-6">
+                        <div className="flex items-center justify-center w-24 h-24 rounded-full bg-white text-primary-600 shadow-md ring-1 ring-slate-900/5 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                          </svg>
+                        </div>
+                        <div className="text-center space-y-3">
+                          <h2 className="text-2xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
+                          <p className="text-lg text-slate-600 max-w-lg mx-auto">{toolText.uploadDesc}</p>
+                          <p className="text-sm text-slate-400">{toolText.uploadSubDesc}</p>
+                        </div>
                       </div>
+
+                      {/* Shortcuts & Info */}
+                      <div className="relative z-10 flex flex-col items-center gap-3">
+                         <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-white/80 px-4 py-1.5 rounded-full border border-slate-200/60 backdrop-blur-sm shadow-sm">
+                            <kbd className="font-sans font-semibold text-slate-500">Ctrl</kbd> <span className="text-slate-300">+</span> <kbd className="font-sans font-semibold text-slate-500">V</kbd> <span>to paste from clipboard</span>
+                         </div>
+                      </div>
+
                       <input id="file-upload" name="file-upload" type="file" className="sr-only" ref={fileInputRef} onChange={handleUpload} accept="image/png, image/jpeg, image/webp" />
-                    </div>
-                    <div className="mt-6">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Try sample images</p>
-                      <div className="grid grid-cols-3 gap-3">
-                        <button
-                          className="group relative rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400"
-                          onClick={() => loadSample('https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_rocks.jpg/800px-Fronalpstock_rocks.jpg')}
-                        >
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_rocks.jpg/320px-Fronalpstock_rocks.jpg" alt="Sample 1" className="w-full h-auto group-hover:opacity-90" />
-                        </button>
-                        <button
-                          className="group relative rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400"
-                          onClick={() => loadSample('https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Golden_gate2.jpg/800px-Golden_gate2.jpg')}
-                        >
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Golden_gate2.jpg/320px-Golden_gate2.jpg" alt="Sample 2" className="w-full h-auto group-hover:opacity-90" />
-                        </button>
-                        <button
-                          className="group relative rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-400"
-                          onClick={() => loadSample('https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Eucalyptus_deglupta_bark.jpg/640px-Eucalyptus_deglupta_bark.jpg')}
-                        >
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Eucalyptus_deglupta_bark.jpg/320px-Eucalyptus_deglupta_bark.jpg" alt="Sample 3" className="w-full h-auto group-hover:opacity-90" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                 ) : (
                   <div className="w-full flex flex-col gap-6">
                      {/* Toolbar */}
-                     <div ref={workspaceToolbarRef} className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl shadow-md border border-slate-200 sticky top-24 z-[60] flex-nowrap overflow-x-hidden overflow-y-visible whitespace-nowrap min-h-[56px]">
+                     <div ref={workspaceToolbarRef} className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-3 rounded-xl shadow-lg border border-white/20 sticky top-24 z-[60] flex-nowrap overflow-x-hidden overflow-y-visible whitespace-nowrap min-h-[56px]">
                         <div className="flex items-center gap-3 flex-nowrap">
                             <button
                                 onClick={handleAutoRemove}
                                 disabled={!originalImage || autoRemoving}
-                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold shrink-0 ${autoRemoving ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 disabled:opacity-60'}`}
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold shrink-0 transition-colors ${autoRemoving ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-600 hover:bg-primary-100 disabled:opacity-60'}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
@@ -1108,9 +1193,9 @@ export default function RemoveColorTool({
                             </button>
                             {/* 检测到的背景色徽标已关闭以保证工具条稳定布局 */}
                             
-                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200 relative whitespace-nowrap shrink-0">
-                                <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[96px] sm:min-w-[110px] md:min-w-[120px]" style={{fontVariantNumeric:'tabular-nums'}}>Tolerance: {Math.round((tolerance / 442) * 100)}%</span>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.tolTip)} onMouseLeave={hideTip} />
+                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200/60 relative whitespace-nowrap shrink-0">
+                                <span className="text-sm font-medium text-slate-700 whitespace-nowrap min-w-[96px] sm:min-w-[110px] md:min-w-[120px]" style={{fontVariantNumeric:'tabular-nums'}}>Tolerance: {Math.round((tolerance / 442) * 100)}%</span>
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-slate-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.tolTip)} onMouseLeave={hideTip} />
                                 <input 
                                     type="range" 
                                     min="1" 
@@ -1119,12 +1204,12 @@ export default function RemoveColorTool({
                                     onChange={(e) => setTolerance(Number(e.target.value))}
                                     onMouseEnter={(e) => showTip(e, toolText.tolTip)}
                                     onMouseLeave={hideTip}
-                                    className="w-24 sm:w-28 md:w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 shrink-0 focus:outline-none focus-visible:outline-none"
+                                    className="w-24 sm:w-28 md:w-32 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary-600 shrink-0 focus:outline-none focus-visible:outline-none"
                                 />
                             </div>
-                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200 relative whitespace-nowrap shrink-0">
-                                <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[88px] sm:min-w-[100px]" style={{fontVariantNumeric:'tabular-nums'}}>Refine: {refineStrength}%</span>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.refineTip)} onMouseLeave={hideTip} />
+                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200/60 relative whitespace-nowrap shrink-0">
+                                <span className="text-sm font-medium text-slate-700 whitespace-nowrap min-w-[88px] sm:min-w-[100px]" style={{fontVariantNumeric:'tabular-nums'}}>Refine: {refineStrength}%</span>
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-slate-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.refineTip)} onMouseLeave={hideTip} />
                                 <input
                                     type="range"
                                     min="0"
@@ -1133,21 +1218,21 @@ export default function RemoveColorTool({
                                     onChange={(e) => setRefineStrength(Number(e.target.value))}
                                     onMouseEnter={(e) => showTip(e, toolText.refineTip)}
                                     onMouseLeave={hideTip}
-                                    className="w-20 sm:w-24 md:w-28 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 shrink-0 focus:outline-none focus-visible:outline-none"
+                                    className="w-20 sm:w-24 md:w-28 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary-600 shrink-0 focus:outline-none focus-visible:outline-none"
                                 />
                                 <button
                                   onClick={() => setAutoRefine(!autoRefine)}
-                                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${autoRefine ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-600'} shrink-0`}
+                                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition-colors ${autoRefine ? 'bg-primary-50 text-primary-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} shrink-0`}
                                 >
                                   Auto Refine
                                 </button>
-                                <QuestionMarkCircleIcon className="w-4 h-4 text-gray-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.autoRefineTip)} onMouseLeave={hideTip} />
+                                <QuestionMarkCircleIcon className="w-4 h-4 text-slate-500 cursor-help" onMouseEnter={(e) => showTip(e, toolText.autoRefineTip)} onMouseLeave={hideTip} />
                             </div>
 
                             <button
                                 onClick={handleUndo}
                                 disabled={targetColors.length === 0}
-                                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                                     <path fillRule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
@@ -1158,7 +1243,7 @@ export default function RemoveColorTool({
                             <button
                               onClick={handleResetEdits}
                               disabled={targetColors.length === 0}
-                              className="rounded-full px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 disabled:opacity-50 shrink-0"
+                              className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50 shrink-0 transition-colors"
                             >
                               Reset Edits
                             </button>
@@ -1168,7 +1253,7 @@ export default function RemoveColorTool({
                      </div>
                      {tooltipState.visible && (
                       <div
-                        className="fixed z-[200] pointer-events-none rounded-md bg-white shadow-lg ring-1 ring-black/10 px-3 py-2 text-xs text-gray-700 max-w-[280px] whitespace-normal break-words"
+                        className="fixed z-[200] pointer-events-none rounded-md bg-white shadow-lg ring-1 ring-slate-900/10 px-3 py-2 text-xs text-slate-700 max-w-[280px] whitespace-normal break-words"
                         style={{ top: tooltipState.y, left: tooltipState.x }}
                       >
                         {tooltipState.text}
@@ -1180,43 +1265,43 @@ export default function RemoveColorTool({
                         {/* Original Image (Clickable) */}
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-semibold text-gray-900">Original (Compare only)</h3>
+                              <h3 className="text-sm font-semibold text-slate-900">Original (Compare only)</h3>
                               <div className="flex items-center">
                                 <button
                                   onClick={handleNewImage}
-                                  className="inline-flex items-center rounded-full bg-[#0071e3] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0077ED] mr-6 md:mr-10"
+                                  className="inline-flex items-center rounded-full bg-cta-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cta-600 mr-6 md:mr-10 transition-colors"
                                 >
                                   Upload New
                                 </button>
                               </div>
                             </div>
-                            <div className="relative w-full overflow-hidden rounded-lg checkerboard border border-gray-300 shadow-sm group">
+                            <div className="relative w-full overflow-hidden rounded-lg checkerboard border border-slate-300 shadow-sm group">
                                 <img 
                                     ref={originalImageRef}
                                     src={imageSrc} 
                                     alt="Original" 
                                     className="w-full h-auto cursor-default select-none"
                                 />
-                                <div className="absolute top-2 right-2 bg-gray-800/80 text-white text-[10px] px-2 py-1 rounded pointer-events-none">Compare only</div>
+                                <div className="absolute top-2 right-2 bg-slate-800/80 text-white text-[10px] px-2 py-1 rounded pointer-events-none">Compare only</div>
                             </div>
                         </div>
 
                         {/* Processed Result */}
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-semibold text-gray-900">Processed Result</h3>
+                              <h3 className="text-sm font-semibold text-slate-900">Processed Result</h3>
                               <div className="flex items-center gap-2 mr-6 md:mr-10">
                                 <button
                                   onClick={handleDownload}
-                                  className="rounded-full bg-[#0071e3] px-5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#0077ED]"
+                                  className="rounded-full bg-cta-500 px-5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cta-600 transition-colors"
                                 >
                                   {toolText.download}
                                 </button>
                                 <Menu as="div" className="relative inline-block text-left">
                                   <div>
-                                    <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 border border-gray-300 rounded-full px-3 py-1.5 text-xs font-semibold text-gray-900 hover:bg-gray-50">
+                                    <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 border border-slate-300 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-50 transition-colors">
                                       {downloadFormat === 'png' ? 'PNG' : downloadFormat === 'jpeg' ? 'JPG' : 'WebP'}
-                                      <ChevronDownIcon className="h-3 w-3 text-gray-500" aria-hidden="true" />
+                                      <ChevronDownIcon className="h-3 w-3 text-slate-500" aria-hidden="true" />
                                     </Menu.Button>
                                   </div>
                                   <Transition
@@ -1227,12 +1312,12 @@ export default function RemoveColorTool({
                                     leaveFrom="transform opacity-100 scale-100"
                                     leaveTo="transform opacity-0 scale-95"
                                   >
-                                    <Menu.Items className="absolute right-0 z-30 mt-2 w-28 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                    <Menu.Items className="absolute right-0 z-30 mt-2 w-28 origin-top-right divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                       <div className="py-1">
                                         <Menu.Item>
                                           {({ active }) => (
                                             <button
-                                              className={`${active ? 'bg-gray-50' : ''} text-gray-700 block w-full text-left px-4 py-2 text-sm`}
+                                              className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`}
                                               onClick={() => setDownloadFormat('png')}
                                             >
                                               PNG
@@ -1242,7 +1327,7 @@ export default function RemoveColorTool({
                                         <Menu.Item>
                                           {({ active }) => (
                                             <button
-                                              className={`${active ? 'bg-gray-50' : ''} text-gray-700 block w-full text-left px-4 py-2 text-sm`}
+                                              className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`}
                                               onClick={() => setDownloadFormat('jpeg')}
                                             >
                                               JPG
@@ -1252,7 +1337,7 @@ export default function RemoveColorTool({
                                         <Menu.Item>
                                           {({ active }) => (
                                             <button
-                                              className={`${active ? 'bg-gray-50' : ''} text-gray-700 block w-full text-left px-4 py-2 text-sm`}
+                                              className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`}
                                               onClick={() => setDownloadFormat('webp')}
                                             >
                                               WebP
@@ -1266,42 +1351,50 @@ export default function RemoveColorTool({
                               </div>
                             </div>
                             <div
-                              className="relative w-full overflow-hidden rounded-lg checkerboard border border-gray-300 shadow-sm group"
+                              className="relative w-full overflow-hidden rounded-lg checkerboard border border-slate-300 shadow-sm group"
                               style={{ overscrollBehavior: 'contain' }}
-                              ref={resultContainerRef}
                             >
                                 {showGuide && (
                                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <div className="rounded-full bg-[#0071e3] text-white text-xs px-3 py-2 shadow-md">
+                                    <div className="rounded-full bg-cta-500 text-white text-xs px-3 py-2 shadow-md animate-bounce">
                                       Click background to remove
                                     </div>
                                   </div>
                                 )}
                                 <div
                                   ref={controlsBarRef}
-                                  className="z-20 flex items-center gap-2 bg-slate-100/90 backdrop-blur rounded-full px-2 py-1 border border-slate-300 shadow-md"
+                                  className="z-20 flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-full px-2 py-1 border border-white/20 shadow-lg"
                                   style={controlsAffixed ? { position: 'fixed', top: controlsAffixPos.top, left: controlsAffixPos.left } : { position: 'absolute', top: '0.5rem', left: '0.5rem' }}
                                 >
                                   <button
-                                    className="rounded-full px-2 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+                                    className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors"
                                     onClick={(e) => handleZoom(1.1, e)}
-                                  >+</button>
-                                  <button
-                                    className="rounded-full px-2 text-sm font-semibold text-gray-900 hover:bg-gray-100"
-                                    onClick={(e) => handleZoom(0.9, e)}
-                                  >−</button>
-                                  <button
-                                    className={`rounded-full px-2 text-sm font-semibold ${panMode ? 'bg-gray-200' : 'hover:bg-gray-100'} text-gray-900`}
-                                    onClick={() => setPanMode(!panMode)}
-                                    aria-label="Pan"
+                                    title="Zoom In"
                                   >
-                                    <HandRaisedIcon className="w-4 h-4 text-gray-900" />
+                                    <MagnifyingGlassPlusIcon className="w-4 h-4" />
                                   </button>
-                                  <span className="text-xs text-gray-600">Zoom: {Math.round(zoom*100)}%</span>
                                   <button
-                                    className="rounded-full px-2 text-sm font-semibold text-gray-900 hover:bg-gray-100"
+                                    className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors"
+                                    onClick={(e) => handleZoom(0.9, e)}
+                                    title="Zoom Out"
+                                  >
+                                    <MagnifyingGlassMinusIcon className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    className={`rounded-full p-2 transition-colors ${panMode ? 'bg-slate-200' : 'hover:bg-slate-100'} text-slate-900`}
+                                    onClick={() => setPanMode(!panMode)}
+                                    title="Pan Mode (Space)"
+                                  >
+                                    <HandRaisedIcon className="w-4 h-4" />
+                                  </button>
+                                  <span className="text-xs text-slate-600 w-12 text-center select-none">{Math.round(zoom*100)}%</span>
+                                  <button
+                                    className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors"
                                     onClick={resetView}
-                                  >Reset View</button>
+                                    title="Reset View"
+                                  >
+                                    <ArrowPathIcon className="w-4 h-4" />
+                                  </button>
                                 </div>
                                 <canvas 
                                     ref={canvasRef}
@@ -1315,7 +1408,7 @@ export default function RemoveColorTool({
                                 </div>
                                 {isProcessing && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                                     </div>
                                 )}
                             </div>
@@ -1328,70 +1421,156 @@ export default function RemoveColorTool({
         </div>
 
         {/* Content Section */}
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-12">
-            <div className="mx-auto max-w-2xl">
-               <h2 className="text-2xl font-bold tracking-tight text-gray-900">{toolText.aboutTitle}</h2>
-               <p className="mt-4 text-lg leading-8 text-gray-600">
-                 {pageText.aboutDesc}
-               </p>
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 space-y-16">
+            
+            {/* Sample Gallery */}
+            <section ref={samplesRef} className="text-center scroll-mt-24">
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-4">{pageText.sampleTitle || 'Try with Samples'}</h2>
+                <p className="text-lg text-slate-600 mb-16 max-w-2xl mx-auto">{pageText.sampleDesc || 'Click any sample below to load it into the editor and see the background removal result instantly.'}</p>
+                
+                <div className="space-y-24">
+                    {SAMPLES.map((sample, index) => (
+                        <div 
+                            key={sample.id} 
+                            className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-20 ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}
+                        >
+                            {/* Text Content */}
+                            <div className="flex-1 text-left space-y-8">
+                                <div>
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-primary-600 transition-colors">
+                                        {sample.title}
+                                    </h3>
+                                    <p className="text-lg text-slate-600 leading-relaxed">{sample.desc}</p>
+                                </div>
+                                
+                                <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100/60 backdrop-blur-sm">
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
+                                        {pageText.sampleSettingsLabel || 'Settings used'}
+                                    </div>
+                                    <div className="flex flex-wrap gap-3">
+                                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-sm font-medium text-slate-600">
+                                            Tolerance: {sample.settings.tolerance}%
+                                        </span>
+                                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-sm font-medium text-slate-600">
+                                            Refine: {sample.settings.refineStrength}
+                                        </span>
+                                         {sample.settings.targetColors && sample.settings.targetColors.length > 0 && (
+                                            <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white shadow-sm border border-slate-100 text-sm font-medium text-slate-600">
+                                                <span 
+                                                    className="w-3 h-3 rounded-full mr-2 shadow-sm ring-1 ring-slate-200" 
+                                                    style={{ backgroundColor: `rgb(${sample.settings.targetColors[0].r}, ${sample.settings.targetColors[0].g}, ${sample.settings.targetColors[0].b})` }}
+                                                ></span>
+                                                Target Color
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                <div className="pt-2">
+                                    <button 
+                                        onClick={() => loadSample(sample)}
+                                        className="group/btn inline-flex items-center gap-2 bg-slate-900 hover:bg-primary-600 text-white font-medium px-6 py-3 rounded-full shadow-lg shadow-slate-900/10 hover:shadow-primary-600/20 transition-all duration-300 transform hover:-translate-y-0.5"
+                                    >
+                                        {pageText.sampleTryButton || 'Try this sample'}
+                                        <ArrowRightIcon className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                                    </button>
+                                </div>
+                            </div>
 
-               {pageText.featureTitle && (
-                 <>
-                   <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.featureTitle}</h2>
-                   <p className="mt-4 text-lg leading-8 text-gray-600">
-                     {pageText.featureDesc}
-                   </p>
-                 </>
-               )}
+                            {/* Interactive Slider */}
+                            <div className="flex-1 w-full max-w-2xl">
+                                <div className="relative rounded-2xl p-2 bg-white shadow-2xl shadow-slate-200/50 ring-1 ring-slate-100 transform transition-transform hover:scale-[1.01] duration-500">
+                                    <ComparisonSlider 
+                                        beforeUrl={sample.beforeUrl} 
+                                        afterUrl={sample.afterUrl} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
 
-               {pageText.useCasesTitle && (
-                 <>
-                   <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.useCasesTitle}</h2>
-                   <div className="mt-4 text-lg leading-8 text-gray-600 whitespace-pre-line">
-                     <div dangerouslySetInnerHTML={{ __html: (pageText.useCasesDesc || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+            {/* About & Features */}
+            <section className="relative overflow-hidden rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
+               <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+               <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-6">{toolText.aboutTitle}</h2>
+               <div className="prose prose-lg prose-slate max-w-none">
+                 <p className="text-slate-600 leading-relaxed">{pageText.aboutDesc}</p>
+                 {pageText.featureTitle && (
+                   <>
+                     <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">{pageText.featureTitle}</h3>
+                     <p className="text-slate-600">{pageText.featureDesc}</p>
+                   </>
+                 )}
+                 {pageText.useCasesTitle && (
+                   <>
+                     <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">{pageText.useCasesTitle}</h3>
+                     <div className="text-slate-600 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: (pageText.useCasesDesc || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                   </>
+                 )}
+               </div>
+            </section>
+
+            {/* How to Use & Tool Guide */}
+            <div ref={howToUseRef} className="grid grid-cols-1 lg:grid-cols-2 gap-8 scroll-mt-24">
+               {/* Tool Settings & Controls */}
+               <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 h-full transition-all hover:shadow-2xl hover:bg-white/70">
+                   <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">{pageText.settingsTitle || 'Tool Settings & Controls'}</h2>
+                   <div className="space-y-6">
+                       {[
+                           { title: pageText.settingToleranceTitle, desc: pageText.settingToleranceDesc },
+                           { title: pageText.settingRefineTitle, desc: pageText.settingRefineDesc },
+                           { title: pageText.settingAutoTitle, desc: pageText.settingAutoDesc },
+                           { title: pageText.settingAutoRefineTitle, desc: pageText.settingAutoRefineDesc }
+                       ].filter(item => item.title).map((item, idx) => (
+                           <div key={idx} className="group">
+                               <h3 className="font-semibold text-slate-900 flex items-center gap-2 mb-2 group-hover:text-primary-600 transition-colors">
+                                   <span className="w-2 h-2 rounded-full bg-cta-500"></span>
+                                   {item.title}
+                               </h3>
+                               <div className="text-sm text-slate-600 pl-4 border-l-2 border-slate-200 group-hover:border-primary-300 transition-colors whitespace-pre-line" dangerouslySetInnerHTML={{ __html: (item.desc || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                           </div>
+                       ))}
                    </div>
-                 </>
-               )}
+               </section>
 
-               <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{pageText.howTitle ?? toolText.stepTitle}</h2>
-               <ul className="mt-4 list-disc pl-5 space-y-2 text-gray-600">
-                  {(pageText.how1 || toolText.step1) && <li>{pageText.how1 ?? toolText.step1}</li>}
-                  {(pageText.how2 || toolText.step2) && <li>{pageText.how2 ?? toolText.step2}</li>}
-                  {(pageText.how3 || toolText.step3) && <li>{pageText.how3 ?? toolText.step3}</li>}
-                  {pageText.how4 && <li>{pageText.how4}</li>}
-                  {pageText.how5 && <li>{pageText.how5}</li>}
-                  {pageText.how6 && <li>{pageText.how6}</li>}
-               </ul>
-
-               <h2 className="mt-12 text-2xl font-bold tracking-tight text-gray-900">{toolText.faqTitle}</h2>
-               <dl className="mt-4 space-y-6 divide-y divide-gray-900/10">
-                 {pageText.faq1Q && (
-                     <div className="pt-6">
-                        <dt className="text-base font-semibold leading-7 text-gray-900">{pageText.faq1Q}</dt>
-                        <dd className="mt-2 text-base leading-7 text-gray-600 whitespace-pre-line">{pageText.faq1A}</dd>
-                     </div>
-                 )}
-                 {pageText.faq2Q && (
-                     <div className="pt-6">
-                        <dt className="text-base font-semibold leading-7 text-gray-900">{pageText.faq2Q}</dt>
-                        <dd className="mt-2 text-base leading-7 text-gray-600 whitespace-pre-line">{pageText.faq2A}</dd>
-                     </div>
-                 )}
-                 {pageText.faq3Q && (
-                     <div className="pt-6">
-                        <dt className="text-base font-semibold leading-7 text-gray-900">{pageText.faq3Q}</dt>
-                        <dd className="mt-2 text-base leading-7 text-gray-600 whitespace-pre-line">{pageText.faq3A}</dd>
-                     </div>
-                 )}
-                 {pageText.faq4Q && (
-                     <div className="pt-6">
-                        <dt className="text-base font-semibold leading-7 text-gray-900">{pageText.faq4Q}</dt>
-                        <dd className="mt-2 text-base leading-7 text-gray-600 whitespace-pre-line">{pageText.faq4A}</dd>
-                     </div>
-                 )}
-               </dl>
+               {/* How to Use */}
+               <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 h-full transition-all hover:shadow-2xl hover:bg-white/70">
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">{pageText.howTitle ?? toolText.stepTitle}</h2>
+                  <ul className="space-y-4">
+                     {[pageText.how1 ?? toolText.step1, pageText.how2 ?? toolText.step2, pageText.how3 ?? toolText.step3, pageText.how4, pageText.how5, pageText.how6].filter(Boolean).map((step, i) => (
+                        <li key={i} className="flex gap-4">
+                            <span className="flex-none flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-600 font-bold text-sm shadow-sm">{i+1}</span>
+                            <span className="text-slate-700 leading-relaxed pt-1">{step}</span>
+                        </li>
+                     ))}
+                  </ul>
+               </section>
             </div>
-        </div>
+
+            {/* FAQ */}
+            <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
+               <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-8">{toolText.faqTitle}</h2>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                 {[
+                    { q: pageText.faq1Q, a: pageText.faq1A },
+                    { q: pageText.faq2Q, a: pageText.faq2A },
+                    { q: pageText.faq3Q, a: pageText.faq3A },
+                    { q: pageText.faq4Q, a: pageText.faq4A },
+                    { q: pageText.faq5Q, a: pageText.faq5A },
+                    { q: pageText.faq6Q, a: pageText.faq6A },
+                    { q: pageText.faq7Q, a: pageText.faq7A }
+                 ].filter(item => item.q).map((faq, idx) => (
+                    <div key={idx} className="bg-white/40 rounded-2xl p-6 shadow-sm border border-white/50 hover:bg-white/60 transition-colors">
+                       <h3 className="text-base font-semibold leading-7 text-slate-900 mb-2">{faq.q}</h3>
+                       <p className="text-sm leading-6 text-slate-600 whitespace-pre-line">{faq.a}</p>
+                    </div>
+                ))}
+               </div>
+            </section>
+         </div>
 
       </main>
       <Footer locale={locale} page={pageName} />

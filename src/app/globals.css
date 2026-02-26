@@ -9,19 +9,19 @@
 .div-markdown-color h4,
 .div-markdown-color h5,
 .div-markdown-color h6 {
-    @apply text-gray-900;
+    @apply text-slate-900;
 }
 
 .div-markdown-color a {
-    @apply text-blue-600;
+    @apply text-primary-600;
 }
 
 .div-markdown-color strong {
-    @apply text-gray-900;
+    @apply text-slate-900;
 }
 
 .div-markdown-color p, .div-markdown-color li {
-    @apply text-gray-700;
+    @apply text-slate-700;
 }
 
 .custom-textarea:focus {
@@ -31,15 +31,15 @@
 
 
 .background-div {
-    @apply bg-[#f5f5f7];
+    @apply bg-slate-50;
 }
 
 .background-header {
-    @apply bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50;
+    @apply bg-white/80 backdrop-blur-md border-b border-white/50 sticky top-0 z-50;
 }
 
 .background-footer {
-    @apply bg-[#f5f5f7] border-t border-gray-200;
+    @apply bg-slate-50 border-t border-slate-200;
 }
 
 .line-clamp-2 {
