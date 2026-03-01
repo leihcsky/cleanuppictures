@@ -1,36 +1,31 @@
 import RemoveShadowTool from "~/components/RemoveShadowTool";
 
-export const revalidate = 120;
-
-export async function generateMetadata({ params: { locale = '' } }) {
-  const { setRequestLocale } = await import('next-intl/server');
-  setRequestLocale(locale);
+export async function generateMetadata({ params: { locale } }) {
   const languageModule = await import('~/i18n/languageText');
   const pageText = await languageModule.getRemoveShadowPageText();
   const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || 'CleanupPictures';
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const title = (pageText.title || '').replace(/%brand%/g, brand);
-  const description = (pageText.description || '').replace(/%brand%/g, brand);
   const canonicalUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
+
   return {
-    title,
-    description,
+    title: pageText.title,
+    description: pageText.description,
     keywords: [
-      brand,
       'remove shadow from photo',
-      'reduce shadow',
-      'shadow reduction',
-      'improve photo lighting',
-      'fix dark areas',
-      'png jpg webp export'
+      'shadow remover',
+      'fix lighting in photos',
+      'brighten dark photos',
+      'remove shadow from face',
+      'png jpg webp export',
+      'cleanup pictures'
     ],
     alternates: {
       canonical: canonicalUrl
     },
     openGraph: {
-      title,
-      description,
+      title: pageText.title,
+      description: pageText.description,
       locale,
       siteName: brand,
       type: 'website',
@@ -38,25 +33,51 @@ export async function generateMetadata({ params: { locale = '' } }) {
     },
     twitter: {
       card: 'summary',
-      title,
-      description
+      title: pageText.title,
+      description: pageText.description
     },
     ...(origin ? { metadataBase: new URL(origin) } : {})
-  };
+  }
 }
 
-export default async function Page({ params: { locale = '' } }) {
-  const { setRequestLocale } = await import('next-intl/server');
-  setRequestLocale(locale);
+export default async function RemoveShadowPage({ params: { locale } }) {
   const languageModule = await import('~/i18n/languageText');
   const pageText = await languageModule.getRemoveShadowPageText();
   const toolText = await languageModule.getToolPageText();
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Remove Shadow from Photo",
+    "description": pageText.description,
+    "applicationCategory": "PhotographyApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "featureList": [
+      "Remove harsh shadows from photos",
+      "Balance uneven lighting",
+      "Export as PNG, JPG, WebP",
+      "Adjust shadow reduction strength",
+      "Privacy-focused local processing"
+    ]
+  };
+
   return (
-    <RemoveShadowTool
-      locale={locale}
-      pageName={'remove-shadow'}
-      pageText={pageText}
-      toolText={toolText}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      />
+      <RemoveShadowTool
+        locale={locale}
+        pageName="remove-shadow"
+        pageText={pageText}
+        toolText={toolText}
+      />
+    </>
   )
 }

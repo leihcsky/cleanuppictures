@@ -262,6 +262,7 @@ export default function RemoveColorTool({
   const workspaceToolbarRef = useRef(null);
   const howToUseRef = useRef(null);
   const samplesRef = useRef(null);
+  const resultContainerRef = useRef(null);
   const [controlsAffixed, setControlsAffixed] = useState(false);
   const [controlsAffixPos, setControlsAffixPos] = useState({ top: 0, left: 0 });
   const loadSample = (sample) => {
@@ -970,7 +971,7 @@ export default function RemoveColorTool({
   useEffect(() => {
     const onScroll = () => {
       const toolbarEl = workspaceToolbarRef.current;
-      const containerEl = workspaceRef.current;
+      const containerEl = resultContainerRef.current;
       const barEl = controlsBarRef.current;
       if (!toolbarEl || !containerEl || !barEl) return;
       const toolbarRect = toolbarEl.getBoundingClientRect();
@@ -1351,6 +1352,7 @@ export default function RemoveColorTool({
                               </div>
                             </div>
                             <div
+                              ref={resultContainerRef}
                               className="relative w-full overflow-hidden rounded-lg checkerboard border border-slate-300 shadow-sm group"
                               style={{ overscrollBehavior: 'contain' }}
                             >

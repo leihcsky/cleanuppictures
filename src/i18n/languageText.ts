@@ -79,6 +79,7 @@ export const getToolPageText = async () => {
     tolTip: tTool('tolTip'),
     refineTip: tTool('refineTip'),
     autoRefineTip: tTool('autoRefineTip'),
+    promptMask: tTool('promptMask'),
   }
 }
 
@@ -121,6 +122,27 @@ export const getRemoveShadowPageText = async () => {
     faq6A: tPage('faq6A'),
     faq7Q: tPage('faq7Q'),
     faq7A: tPage('faq7A'),
+    sampleTitle: tPage('sampleTitle'),
+    sampleDesc: tPage('sampleDesc'),
+    sample1Title: tPage('sample1Title'),
+    sample1Desc: tPage('sample1Desc'),
+    sample2Title: tPage('sample2Title'),
+    sample2Desc: tPage('sample2Desc'),
+    seeSamplesBtn: tPage('seeSamplesBtn'),
+    howToUseBtn: tPage('howToUseBtn'),
+    settingStrengthDesc: tPage('settingStrengthDesc'),
+    settingAggressiveDesc: tPage('settingAggressiveDesc'),
+    sampleSettingsLabel: tPage('sampleSettingsLabel'),
+    trySampleBtn: tPage('trySampleBtn'),
+    howToUseTitle: tPage('howToUseTitle'),
+    howToUseDesc: tPage('howToUseDesc'),
+    step1Title: tPage('step1Title'),
+    step1Desc: tPage('step1Desc'),
+    step2Title: tPage('step2Title'),
+    step2Desc: tPage('step2Desc'),
+    step3Title: tPage('step3Title'),
+    step3Desc: tPage('step3Desc'),
+    promptMask: tPage('promptMask'),
   }
 }
 
@@ -234,61 +256,76 @@ export const getPricingText = async () => {
   const title = tPricing('title') + ' | ' + process.env.NEXT_PUBLIC_WEBSITE_NAME;
   const description = tPricing('description');
   const h1Text =  tPricing('h1Text');
-  const basic =  tPricing('basic');
-  const essential =  tPricing('essential');
-  const growth =  tPricing('growth');
-  const buyText=  tPricing('buyText');
-  const popularText = tPricing('popularText');
-  const creditsText = tPricing('creditsText');
-  const creditText = tPricing('creditText');
-  const free = tPricing('free');
-  const free0 = tPricing('free0');
-  const freeText = tPricing('freeText');
-  let freeIntro0 = tPricing('freeIntro0');
-  const freeIntro1 = tPricing('freeIntro1');
-  const freeIntro2 = tPricing('freeIntro2');
-  const subscriptionIntro0 = tPricing('subscriptionIntro0');
-  const subscriptionIntro1 = tPricing('subscriptionIntro1');
-  const subscriptionIntro2 = tPricing('subscriptionIntro2');
-  const subscriptionIntro3 = tPricing('subscriptionIntro3');
-  const subscriptionIntro4 = tPricing('subscriptionIntro4');
-  const monthText = tPricing('monthText');
-  const monthlyText = tPricing('monthlyText');
-  const annualText = tPricing('annualText');
-  const annuallyText = tPricing('annuallyText');
-  const annuallySaveText = tPricing('annuallySaveText');
-
-  // 免费生成次数
-  const freeTimes = process.env.FREE_TIMES;
-  freeIntro0 = freeIntro0.replace(/%freeTimes%/g, freeTimes);
 
   return {
-    title: title,
-    description: description,
-    h1Text: h1Text,
-    basic: basic,
-    essential: essential,
-    growth: growth,
-    buyText: buyText,
-    popularText: popularText,
-    creditsText: creditsText,
-    creditText: creditText,
-    free: free,
-    free0: free0,
-    freeText: freeText,
-    freeIntro0: freeIntro0,
-    freeIntro1: freeIntro1,
-    freeIntro2: freeIntro2,
-    subscriptionIntro0: subscriptionIntro0,
-    subscriptionIntro1: subscriptionIntro1,
-    subscriptionIntro2: subscriptionIntro2,
-    subscriptionIntro3: subscriptionIntro3,
-    subscriptionIntro4: subscriptionIntro4,
-    monthText: monthText,
-    monthlyText: monthlyText,
-    annualText: annualText,
-    annuallyText: annuallyText,
-    annuallySaveText: annuallySaveText,
+    title,
+    description,
+    h1Text,
+    monthly: tPricing('monthly'),
+    yearly: tPricing('yearly'),
+    saveText: tPricing('saveText'),
+    perMonth: tPricing('perMonth'),
+    billedYearly: tPricing('billedYearly'),
+    billedMonthly: tPricing('billedMonthly'),
+
+    freeTitle: tPricing('freeTitle'),
+    freePrice: tPricing('freePrice'),
+    freeCredits: tPricing('freeCredits'),
+    freeFeature1: tPricing('freeFeature1'),
+    freeFeature2: tPricing('freeFeature2'),
+    freeFeature3: tPricing('freeFeature3'),
+    freeFeature4: tPricing('freeFeature4'),
+    freeBtn: tPricing('freeBtn'),
+
+    starterTitle: tPricing('starterTitle'),
+    starterPriceMonth: tPricing('starterPriceMonth'),
+    starterPriceYear: tPricing('starterPriceYear'),
+    starterCredits: tPricing('starterCredits'),
+    starterFeature1: tPricing('starterFeature1'),
+    starterFeature2: tPricing('starterFeature2'),
+    starterFeature3: tPricing('starterFeature3'),
+    starterFeature4: tPricing('starterFeature4'),
+    starterFeature5: tPricing('starterFeature5'),
+    starterBtn: tPricing('starterBtn'),
+
+    proTitle: tPricing('proTitle'),
+    proPriceMonth: tPricing('proPriceMonth'),
+    proPriceYear: tPricing('proPriceYear'),
+    proCredits: tPricing('proCredits'),
+    proFeature1: tPricing('proFeature1'),
+    proFeature2: tPricing('proFeature2'),
+    proFeature3: tPricing('proFeature3'),
+    proFeature4: tPricing('proFeature4'),
+    proFeature5: tPricing('proFeature5'),
+    proBtn: tPricing('proBtn'),
+    popularTag: tPricing('popularTag'),
+
+    businessTitle: tPricing('businessTitle'),
+    businessPriceMonth: tPricing('businessPriceMonth'),
+    businessPriceYear: tPricing('businessPriceYear'),
+    businessCredits: tPricing('businessCredits'),
+    businessFeature1: tPricing('businessFeature1'),
+    businessFeature2: tPricing('businessFeature2'),
+    businessFeature3: tPricing('businessFeature3'),
+    businessFeature4: tPricing('businessFeature4'),
+    businessFeature5: tPricing('businessFeature5'),
+    businessBtn: tPricing('businessBtn'),
+
+    payGoTitle: tPricing('payGoTitle'),
+    payGoDesc: tPricing('payGoDesc'),
+    payGoOption1: tPricing('payGoOption1'),
+    payGoPrice1: tPricing('payGoPrice1'),
+    payGoOption2: tPricing('payGoOption2'),
+    payGoPrice2: tPricing('payGoPrice2'),
+    payGoOption3: tPricing('payGoOption3'),
+    payGoPrice3: tPricing('payGoPrice3'),
+    payGoBtn: tPricing('payGoBtn'),
+
+    creditExplTitle: tPricing('creditExplTitle'),
+    creditExplDesc: tPricing('creditExplDesc'),
+    creditExpl1: tPricing('creditExpl1'),
+    creditExpl2: tPricing('creditExpl2'),
+    creditExpl3: tPricing('creditExpl3'),
   }
 }
 

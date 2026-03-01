@@ -6,7 +6,8 @@ import {useCommonContext} from '~/context/common-context';
 
 const LoginButton = ({
                        buttonType = 0,
-                       loginText = 'Log in'
+                       loginText = 'Log in',
+                       className = ''
                      }) => {
 
   const router = useRouter();
@@ -49,16 +50,16 @@ const LoginButton = ({
             {
               loading ? (
                   <button
-                    className="inline-flex w-full justify-center gap-x-1.5 border border-[rgba(255,255,255,0.5)] rounded-md px-3 py-2 text-sm font-semibold hover:border-[rgba(255,255,255,0.9)]"
+                    className={`inline-flex justify-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold ${className}`}
                     disabled
                   >
-                    <p>Login</p>
+                    <p>{loginText}</p>
                     {whiteLoadingSvg}
                   </button>
                 ) :
                 (
                   <button
-                    className="inline-flex w-full justify-center gap-x-1.5 border border-[rgba(255,255,255,0.5)] rounded-md px-3 py-2 text-sm font-semibold hover:border-[rgba(255,255,255,0.9)]"
+                    className={`inline-flex justify-center gap-x-1.5 rounded-md px-3 py-2 text-sm font-semibold ${className}`}
                     onClick={login}
                   >
                     {loginText}
@@ -73,7 +74,7 @@ const LoginButton = ({
           <>
             {
               <button
-                className="my-auto mx-auto mr-4 mt-1 inline-flex w-full justify-center gap-x-1.5 rounded-md text-sm font-semibold"
+                className={`inline-flex justify-center gap-x-1.5 rounded-md text-sm font-semibold ${className}`}
                 onClick={logout}
               >
                 <img className="h-8 w-auto rounded-full" src={userData.image} alt=""/>

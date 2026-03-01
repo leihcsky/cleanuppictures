@@ -46,7 +46,7 @@ export default function Header({
   }
 
   return (
-    <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-full border border-white/50 bg-white/70 backdrop-blur-xl shadow-lg transition-all duration-300">
+    <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-2xl border border-white/50 bg-white/70 backdrop-blur-xl shadow-lg transition-all duration-300">
       <LoadingModal loadingText={commonText.loadingText} />
       <GeneratingModal generatingText={commonText.generateText} />
       <LoginModal
@@ -109,49 +109,59 @@ export default function Header({
             {menuText.header2}
           </Link>
         </div>
-        <Menu as="div" className="hidden lg:relative lg:inline-block lg:text-left z-30">
-          <div>
-            <Menu.Button
-              className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-full px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm">
-              <GlobeAltIcon className="w-5 h-5 text-slate-500" />{locale == 'default' ? 'EN' : locale.toUpperCase()}
-              <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-500" aria-hidden="true" />
-            </Menu.Button>
-          </div>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items
-              className="absolute right-0 z-30 mt-2 w-26 origin-top-right divide-y divide-gray-100 rounded-xl bg-white/80 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-              <div className="py-1 z-30">
-                {
-                  languages.map((item) => {
-                    let hrefValue = `/${item.lang}`;
-                    if (page) {
-                      hrefValue = `/${item.lang}/${page}`;
-                    }
-                    return (
-                      <Menu.Item key={item.lang}>
-                        <Link href={hrefValue} onClick={() => checkLocalAndLoading(item.lang)} className={"z-30"}>
-                          <span
-                            className={'text-slate-700 block px-4 py-2 text-sm hover:text-primary-600 hover:bg-primary-50 z-30 transition-colors'}
-                          >
-                            {item.language}
-                          </span>
-                        </Link>
-                      </Menu.Item>
-                    )
-                  })
-                }
-              </div>
-            </Menu.Items>
-          </Transition>
-        </Menu>
+        <div className="hidden lg:flex lg:items-center lg:gap-4">
+          <Menu as="div" className="relative inline-block text-left z-30">
+            <div>
+              <Menu.Button
+                className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm">
+                <GlobeAltIcon className="w-5 h-5 text-slate-500" />{locale == 'default' ? 'EN' : locale.toUpperCase()}
+                <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-500" aria-hidden="true" />
+              </Menu.Button>
+            </div>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items
+                className="absolute right-0 z-30 mt-2 w-26 origin-top-right divide-y divide-gray-100 rounded-xl bg-white/80 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className="py-1 z-30">
+                  {
+                    languages.map((item) => {
+                      let hrefValue = `/${item.lang}`;
+                      if (page) {
+                        hrefValue = `/${item.lang}/${page}`;
+                      }
+                      return (
+                        <Menu.Item key={item.lang}>
+                          <Link href={hrefValue} onClick={() => checkLocalAndLoading(item.lang)} className={"z-30"}>
+                            <span
+                              className={'text-slate-700 block px-4 py-2 text-sm hover:text-primary-600 hover:bg-primary-50 z-30 transition-colors'}
+                            >
+                              {item.language}
+                            </span>
+                          </Link>
+                        </Menu.Item>
+                      )
+                    })
+                  }
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
+          
+          {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
+            <LoginButton
+              buttonType={userData ? 1 : 0}
+              loginText={authText?.loginText || 'Login'}
+              className={userData ? "" : "border border-white/50 bg-white/50 rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm"}
+            />
+          )}
+        </div>
       </nav>
       <Dialog as="div" className="lg:hidden" open={mobileMenuOpen} onClose={setMobileMenuOpen}>
         <div className="fixed inset-0 z-[60]" />
@@ -203,6 +213,15 @@ export default function Header({
                   <FaceSmileIcon className="w-5 h-5" />
                   {menuText.header2}
                 </Link>
+                {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
+                  <div className="pt-4 mt-4 border-t border-gray-100">
+                    <LoginButton
+                      buttonType={userData ? 1 : 0}
+                      loginText={authText?.loginText || 'Login'}
+                      className={userData ? "justify-start" : "-mx-3 flex w-full justify-start rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors"}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

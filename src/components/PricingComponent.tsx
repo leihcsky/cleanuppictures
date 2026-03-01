@@ -1,33 +1,43 @@
 import {getStripe} from '~/libs/stripeClient';
 import React, {useState} from 'react';
 import {useCommonContext} from "~/context/common-context";
-import LoadingDots from "./LoadingDots";
 import {priceList} from "~/configs/stripeConfig";
+
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
 
 export default function Pricing({
                                   redirectUrl,
                                   isPricing = false
                                 }) {
   const [priceIdLoading, setPriceIdLoading] = useState<string>();
+  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  
   const {
     setShowLoginModal,
     userData,
     pricingText
   } = useCommonContext();
 
-  const handleCheckout = async (price) => {
-    setPriceIdLoading(price.id);
+  const handleCheckout = async (priceId: string, type: 'recurring' | 'one_time') => {
+    setPriceIdLoading(priceId);
     if (!userData || !userData.user_id) {
       setShowLoginModal(true);
-      return
+      setPriceIdLoading(undefined);
+      return;
     }
     const user_id = userData.user_id;
     try {
+      const price = { id: priceId, type }; 
+      
       const data = {
         price,
         redirectUrl,
         user_id
-      }
+      };
       const url = `/api/stripe/create-checkout-session`;
       const response = await fetch(url, {
         method: 'POST',
@@ -36,6 +46,10 @@ export default function Pricing({
         body: JSON.stringify(data)
       });
       const res = await response.json();
+      if (res.error) {
+          alert(res.error);
+          return;
+      }
       const sessionId = res.sessionId;
       const stripe = await getStripe();
       stripe?.redirectToCheckout({sessionId});
@@ -44,306 +58,224 @@ export default function Pricing({
     } finally {
       setPriceIdLoading(undefined);
     }
-  }
+  };
 
-  if (!priceList?.length)
-    return (
-      <div className={(isPricing ? "" : "background-div") + " flex flex-col items-center"}>
-        <div className="max-w-screen-lg grid place-items-center bg-slate-100 text-slate-600 p-4 gap-4">
-          <div id="introduction" className="bg-white shadow-md rounded border-slate-200 p-5">
-            <div className="text-slate-800 space-y-2 mb-0">
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const plans = [
+    {
+      id: 'free',
+      title: pricingText.freeTitle,
+      price: pricingText.freePrice,
+      period: '',
+      description: pricingText.freeCredits,
+      features: [
+        pricingText.freeFeature1,
+        pricingText.freeFeature2,
+        pricingText.freeFeature3,
+        pricingText.freeFeature4,
+      ],
+      buttonText: pricingText.freeBtn,
+      buttonAction: () => window.location.href = '/',
+      isPopular: false,
+    },
+    {
+      id: period === 'monthly' ? 'price_starter_monthly' : 'price_starter_yearly',
+      title: pricingText.starterTitle,
+      price: period === 'monthly' ? pricingText.starterPriceMonth : pricingText.starterPriceYear,
+      period: pricingText.perMonth,
+      description: pricingText.starterCredits,
+      features: [
+        pricingText.starterFeature1,
+        pricingText.starterFeature2,
+        pricingText.starterFeature3,
+        pricingText.starterFeature4,
+        pricingText.starterFeature5,
+      ],
+      buttonText: pricingText.starterBtn,
+      buttonAction: () => handleCheckout(period === 'monthly' ? 'price_starter_monthly' : 'price_starter_yearly', 'recurring'),
+      isPopular: false,
+    },
+    {
+      id: period === 'monthly' ? 'price_pro_monthly' : 'price_pro_yearly',
+      title: pricingText.proTitle,
+      price: period === 'monthly' ? pricingText.proPriceMonth : pricingText.proPriceYear,
+      period: pricingText.perMonth,
+      description: pricingText.proCredits,
+      features: [
+        pricingText.proFeature1,
+        pricingText.proFeature2,
+        pricingText.proFeature3,
+        pricingText.proFeature4,
+        pricingText.proFeature5,
+      ],
+      buttonText: pricingText.proBtn,
+      buttonAction: () => handleCheckout(period === 'monthly' ? 'price_pro_monthly' : 'price_pro_yearly', 'recurring'),
+      isPopular: true,
+    },
+  ];
+
+  const credits = [
+    { credits: pricingText.payGoOption1, price: pricingText.payGoPrice1, id: 'price_credit_100' },
+    { credits: pricingText.payGoOption2, price: pricingText.payGoPrice2, id: 'price_credit_500' },
+    { credits: pricingText.payGoOption3, price: pricingText.payGoPrice3, id: 'price_credit_1500' },
+  ];
 
   return (
-    <section className={(isPricing ? "" : "background-div") + " bg-cover bg-center bg-no-repeat text-white"}>
-      <div className="mx-auto w-full max-w-7xl px-5 py-4 md:px-6 md:py-8">
-        <div className="flex flex-col items-center justify-start">
-          <div className="mx-auto mb-12 flex max-w-3xl flex-col items-center">
-            <h2 className="text-5xl font-bold">{pricingText.h1Text}</h2>
-          </div>
-          <div className="grid w-full grid-cols-1 gap-16 md:grid-cols-3 md:gap-4 lg:gap-8">
-            <div className="mx-auto flex w-full max-w-[416px] flex-col">
-              <div className="flex w-full flex-col items-start rounded-xl bg-[#2b306b] p-10">
-                <div className="mb-4 rounded-lg bg-[#0a2836] px-4 py-1.5">
-                  <p
-                    className="text-sm font-bold text-white">{pricingText.free}</p>
-                </div>
-                <h2 className="mt-8 mb-6 text-3xl font-bold md:mb-8 md:text-5xl lg:mb-12">{pricingText.free0}</h2>
-                <div
-                  className="w-full bg-[#2b306b] px-6 py-4 text-center font-semibold text-[#2b306b] cursor-pointer inline-flex justify-center items-center text-sm leading-6 shadow-sm"
-                >
-                  {pricingText.buyText}
-                </div>
-              </div>
-              <div className="mt-10 flex flex-col items-start gap-5">
-                <div className="flex flex-row items-start text-white">
-                  <div className="mr-2 flex text-[#2d6ae0]">
-                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                         xmlns="http://www.w3.org/2000/svg">
-                      <path
-                        d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                        fill="currentColor"></path>
-                    </svg>
-                  </div>
-                  <p className="text-[#7c8aaa]">
-                    <span className="font-bold text-white">{pricingText.freeIntro0}</span>
-                  </p>
-                </div>
-                <div className="flex flex-row items-start text-white">
-                  <div className="mr-2 flex text-red-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" width="32" height="32" viewBox="0 0 32 32"
-                         strokeWidth="1.5"
-                         stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" fill="currentColor"/>
-                    </svg>
-                  </div>
-                  <p className="text-[#7c8aaa]">
-                    <span className="font-bold text-white">{pricingText.freeIntro1}</span>
-                  </p>
-                </div>
-                <div className="flex flex-row items-start text-white">
-                  <div className="mr-2 flex text-red-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" width="32" height="32" viewBox="0 0 32 32"
-                         strokeWidth="1.5"
-                         stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12"
-                            fill="currentColor"/>
-                    </svg>
-                  </div>
-                  <p className="text-[#7c8aaa]">
-                    <span className="font-bold text-white">{pricingText.freeIntro2}</span>
-                  </p>
-                </div>
-                <div className="flex flex-row items-start text-white">
-                  <div className="mr-2 flex text-red-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" width="32" height="32" viewBox="0 0 32 32"
-                         strokeWidth="1.5"
-                         stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12"
-                            fill="currentColor"/>
-                    </svg>
-                  </div>
-                  <p className="text-[#7c8aaa]">
-                    <span className="font-bold text-white">{pricingText.subscriptionIntro4}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-            {
-              priceList?.map((price, index) => {
-                if (!price) return null;
-                const priceString = new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: price.currency!,
-                  minimumFractionDigits: 0
-                }).format((price?.unit_amount || 0) / 100);
+    <section className={(isPricing ? "py-24" : "py-12") + " bg-slate-50"}>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+            {pricingText.h1Text}
+          </h2>
+          <p className="mt-4 text-lg leading-8 text-slate-600">
+            {pricingText.description}
+          </p>
+        </div>
 
-
-                const perDownloadPrice = (price?.unit_amount || 0) / 100 / 12;
-                const pricePerString = new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: price.currency!,
-                  minimumFractionDigits: 0
-                }).format(perDownloadPrice);
-
-                if (index != 0) {
-                  return (
-                    <div key={price.id} className="mx-auto flex w-full max-w-[416px] flex-col">
-                      <div className="flex w-full flex-col items-start rounded-xl bg-[#2b306b] p-10">
-                        <div className="mb-4 rounded-lg bg-[#0a1836] px-4 py-1.5">
-                          <p
-                            className="text-sm font-bold text-white">{pricingText.basic}</p>
-                        </div>
-                        <h2
-                          className="mb-5 text-2xl font-bold md:mb-6 md:text-4xl lg:mb-8">{priceString}/{pricingText.monthText}</h2>
-                        <h2
-                          className="mb-2 text-lg font-bold md:mb-3 md:text-xl lg:mb-4">{priceString} {pricingText.monthlyText}</h2>
-                        <a
-                          type="button"
-                          className="w-full rounded-full bg-[#f05011] px-6 py-4 text-center font-bold text-white cursor-pointer inline-flex justify-center items-center text-sm leading-6 shadow-sm"
-                          onClick={() => handleCheckout(price)}
-                        >
-                          {pricingText.buyText}
-                          {priceIdLoading && priceIdLoading == price.id && (
-                            <i className="flex pl-2 m-0">
-                              <LoadingDots/>
-                            </i>
-                          )}
-                        </a>
-                      </div>
-                      <div className="mt-10 flex flex-col items-start gap-5">
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro0}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro1}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro2}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro4}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                } else {
-                  return (
-                    <div key={pricePerString} className="mx-auto flex w-full max-w-[416px] flex-col">
-                      <div
-                        className="flex flex-col items-start rounded-xl bg-[#2d6ae0] bg-cover bg-center bg-no-repeat p-10 text-white"
-                        style={{backgroundImage: 'https://assets.website-files.com/6502af467b2a8c4ee8159a5b/6502af467b2a8c4ee8159a8b_Mask%20group.svg'}}>
-                        <div className="mb-4 flex flex-row flex-wrap gap-4">
-                          <div className="flex items-center gap-1.5 rounded-lg bg-[#ffa11b] px-4 py-1.5 text-white">
-                            <div className="flex">
-                              <svg width="17" height="16" viewBox="0 0 17 16" fill="none"
-                                   xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                  d="M15.2528 4.59353C15.1098 4.47414 14.9361 4.39736 14.7515 4.37194C14.567 4.34652 14.379 4.37349 14.2091 4.44977L11.0466 5.85602L9.20905 2.54353C9.12123 2.38887 8.99398 2.26026 8.84028 2.17079C8.68657 2.08132 8.5119 2.03418 8.33405 2.03418C8.1562 2.03418 7.98153 2.08132 7.82783 2.17079C7.67412 2.26026 7.54688 2.38887 7.45905 2.54353L5.62155 5.85602L2.45905 4.44977C2.28874 4.37361 2.10052 4.3466 1.91567 4.37181C1.73081 4.39701 1.5567 4.47343 1.413 4.59242C1.2693 4.71141 1.16176 4.86822 1.10252 5.04513C1.04329 5.22205 1.03473 5.412 1.0778 5.59353L2.6653 12.3623C2.69566 12.4933 2.7523 12.6168 2.8318 12.7253C2.9113 12.8338 3.012 12.9251 3.1278 12.9935C3.28458 13.0874 3.46383 13.137 3.64655 13.1373C3.73537 13.1371 3.82373 13.1245 3.90905 13.0998C6.80269 12.2998 9.85916 12.2998 12.7528 13.0998C13.017 13.1692 13.298 13.131 13.5341 12.9935C13.6506 12.926 13.7518 12.835 13.8314 12.7263C13.911 12.6177 13.9672 12.4937 13.9966 12.3623L15.5903 5.59353C15.6329 5.41195 15.6239 5.22208 15.5642 5.04537C15.5046 4.86866 15.3967 4.71215 15.2528 4.59353V4.59353Z"
-                                  fill="currentColor"></path>
-                              </svg>
-                            </div>
-                            <p className="text-sm font-bold text-white">{pricingText.popularText}</p>
-                          </div>
-                        </div>
-                        <h2
-                          className="mb-2 text-2xl font-bold md:mb-3 md:text-4xl lg:mb-6">{pricePerString}/{pricingText.monthText}</h2>
-                        <h2
-                          className="mb-2 text-lg font-bold md:mb-3 md:text-xl lg:mb-6">{priceString} {pricingText.annuallyText} {pricingText.annuallySaveText}</h2>
-                        <a
-                          type="button"
-                          className="w-full rounded-full bg-[#f05011] px-6 py-4 text-center font-bold text-white cursor-pointer inline-flex justify-center items-center text-sm leading-6 shadow-sm"
-                          onClick={() => handleCheckout(price)}
-                        >
-                          {pricingText.buyText}
-                          {priceIdLoading && priceIdLoading == price.id && (
-                            <i className="flex pl-2 m-0">
-                              <LoadingDots/>
-                            </i>
-                          )}
-                        </a>
-                      </div>
-                      <div className="mt-10 flex flex-col items-start gap-5">
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro0}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro1}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro2}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-row items-start text-white">
-                          <div className="mr-2 flex text-[#2d6ae0]">
-                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"
-                                 xmlns="http://www.w3.org/2000/svg">
-                              <path
-                                d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"
-                                fill="currentColor"></path>
-                            </svg>
-                          </div>
-                          <p className="text-[#7c8aaa]">
-                            <span className="font-bold text-white">{pricingText.subscriptionIntro4}</span>
-                          </p>
-                        </div>
-                        {/*<div className="flex flex-row items-start text-white">*/}
-                        {/*  <div className="mr-2 flex text-[#2d6ae0]">*/}
-                        {/*    <svg width="32" height="32" viewBox="0 0 32 32" fill="none"*/}
-                        {/*         xmlns="http://www.w3.org/2000/svg">*/}
-                        {/*      <path*/}
-                        {/*        d="M8.82291 15.198C8.47774 15.199 8.1399 15.3027 7.84846 15.4969C7.55703 15.6911 7.32392 15.968 7.1761 16.2955C7.02829 16.623 6.9718 16.9878 7.01319 17.3476C7.05457 17.7074 7.19213 18.0476 7.40995 18.3287L12.0534 24.3014C12.219 24.5172 12.4312 24.6885 12.6725 24.8009C12.9137 24.9134 13.177 24.9638 13.4406 24.9479C14.0042 24.9161 14.513 24.5995 14.8375 24.079L24.4831 7.76799C24.4847 7.76528 24.4863 7.76257 24.488 7.75991C24.5785 7.614 24.5492 7.32485 24.3624 7.1432C24.3111 7.09331 24.2506 7.05499 24.1846 7.03058C24.1186 7.00618 24.0486 6.99621 23.9789 7.00129C23.9091 7.00637 23.8411 7.02639 23.7789 7.06013C23.7168 7.09386 23.662 7.14059 23.6177 7.19743C23.6142 7.2019 23.6107 7.2063 23.607 7.21064L13.8792 18.7511C13.8422 18.795 13.7973 18.8308 13.747 18.8563C13.6967 18.8818 13.6421 18.8966 13.5863 18.8998C13.5305 18.9029 13.4747 18.8944 13.4221 18.8747C13.3695 18.8551 13.3211 18.8246 13.2798 18.7852L10.0513 15.7003C9.71603 15.3776 9.27778 15.1984 8.82291 15.198Z"*/}
-                        {/*        fill="currentColor"></path>*/}
-                        {/*    </svg>*/}
-                        {/*  </div>*/}
-                        {/*  <p className="text-[#7c8aaa]">*/}
-                        {/*    <span className="font-bold text-white">{pricingText.subscriptionIntro3}</span>*/}
-                        {/*  </p>*/}
-                        {/*</div>*/}
-                      </div>
-                    </div>
-                  )
-                }
-              })
-            }
+        {/* Toggle */}
+        <div className="flex justify-center mb-12">
+          <div className="relative flex bg-slate-200 rounded-full p-1">
+            <button
+              onClick={() => setPeriod('monthly')}
+              className={`${
+                period === 'monthly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              } relative rounded-full py-2 px-6 text-sm font-semibold whitespace-nowrap focus:outline-none transition-all duration-200`}
+            >
+              {pricingText.monthly}
+            </button>
+            <button
+              onClick={() => setPeriod('yearly')}
+              className={`${
+                period === 'yearly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              } relative rounded-full py-2 px-6 text-sm font-semibold whitespace-nowrap focus:outline-none transition-all duration-200`}
+            >
+              {pricingText.yearly}
+              <span className="absolute -top-3 -right-3 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                {pricingText.saveText}
+              </span>
+            </button>
           </div>
         </div>
+
+        {/* Plans Grid */}
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 mb-20">
+          {plans.map((plan, index) => (
+            <div
+              key={index}
+              className={`relative flex flex-col rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-lg ${
+                plan.isPopular ? 'ring-2 ring-blue-600 shadow-md scale-105 z-10' : ''
+              }`}
+            >
+              {plan.isPopular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-sm font-semibold text-white shadow-sm">
+                  {pricingText.popularTag}
+                </div>
+              )}
+              
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-slate-900">{plan.title}</h3>
+                <div className="mt-4 flex items-baseline">
+                  <span className="text-4xl font-bold tracking-tight text-slate-900">{plan.price}</span>
+                  {plan.period && (
+                    <span className="text-sm font-semibold leading-6 text-slate-600 ml-1">{plan.period}</span>
+                  )}
+                </div>
+                {period === 'yearly' && plan.price !== '$0' && (
+                  <p className="mt-1 text-sm text-slate-500">{pricingText.billedYearly}</p>
+                )}
+                 {period === 'monthly' && plan.price !== '$0' && (
+                  <p className="mt-1 text-sm text-slate-500">{pricingText.billedMonthly}</p>
+                )}
+                <p className="mt-4 text-sm font-medium text-blue-600">{plan.description}</p>
+              </div>
+
+              <ul role="list" className="mb-8 space-y-4 flex-1">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <CheckIcon className="h-6 w-5 flex-none text-blue-600" />
+                    <span className="text-sm text-slate-600">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                onClick={plan.buttonAction}
+                disabled={!!priceIdLoading}
+                className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  plan.isPopular
+                    ? 'bg-blue-600 text-white hover:bg-blue-500 focus-visible:outline-blue-600'
+                    : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900'
+                } ${priceIdLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {priceIdLoading === plan.id ? 'Processing...' : plan.buttonText}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Pay As You Go & Credits Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          
+          {/* Pay As You Go */}
+          <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+            <h3 className="text-2xl font-bold text-slate-900 mb-2">{pricingText.payGoTitle}</h3>
+            <p className="text-slate-600 mb-8">{pricingText.payGoDesc}</p>
+            
+            <div className="space-y-4">
+              {credits.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-blue-200 transition-colors">
+                  <span className="font-semibold text-slate-900">{item.credits}</span>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xl font-bold text-slate-900">{item.price}</span>
+                    <button
+                      onClick={() => handleCheckout(item.id, 'one_time')}
+                      disabled={!!priceIdLoading}
+                      className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-300 hover:bg-blue-50 disabled:opacity-70"
+                    >
+                       {priceIdLoading === item.id ? '...' : pricingText.payGoBtn}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* How Credits Work */}
+          <div className="rounded-2xl bg-slate-900 p-8 shadow-sm text-white">
+            <h3 className="text-2xl font-bold mb-6">{pricingText.creditExplTitle}</h3>
+            <p className="text-slate-300 mb-8">{pricingText.creditExplDesc}</p>
+            
+            <ul className="space-y-6">
+              <li className="flex gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+                  <span className="text-xl">🖼️</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold">{pricingText.creditExpl1}</h4>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+                  <span className="text-xl">✨</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold">{pricingText.creditExpl2}</h4>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+                  <span className="text-xl">🔄</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold">{pricingText.creditExpl3}</h4>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
       </div>
     </section>
   );
-
-
 }
