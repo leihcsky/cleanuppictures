@@ -97,12 +97,23 @@
     "header1": "Remove Shadow",
     "header2": "Remove Emoji",
     "header3": "Remove Color",
+    "home": "Home",
+    "tools": "Tools",
+    "pricing": "Pricing",
     "footerLegal": "Legal",
     "footerLegal0": "Privacy Policy",
     "footerLegal1": "Terms & Conditions",
     "footerSupport": "Support",
     "footerSupport0": "Pricing",
     "footerSupport1": "Manage Subscribe"
+  },
+  "PricingPageText": {
+    "title": "Pricing Plans",
+    "description": "Choose the best plan for your needs.",
+    "free": "Free",
+    "pro": "Pro",
+    "contact": "Contact Us",
+    "comingSoon": "Coming Soon"
   },
   "ToolPageText": {
     "uploadTitle": "Upload an Image",
@@ -124,7 +135,8 @@
     "tolTip": "Increase to include more similar shades; may affect fine details",
     "refineTip": "Smooth and feather the mask to reduce jagged edges",
     "autoRefineTip": "Automatically adapts refine strength based on image; disable to use slider only",
-    "promptMask": "Please paint over the shadow area first."
+    "promptMask": "Please paint over the shadow area first.",
+    "processFailed": "Processing failed. Please try again."
   },
   "RemoveShadowPage": {
     "title": "Remove Shadow from Photo Online – Free Shadow Reduction Tool",
@@ -176,10 +188,12 @@
     "faq7A": "No. Downloads are clean and watermark-free.",
     "sampleTitle": "Try with Samples",
     "sampleDesc": "See how the tool improves lighting on these examples.",
-    "sample1Title": "Building Shadow",
-    "sample1Desc": "Reduce harsh shadows on building facades to reveal details.",
-    "sample2Title": "Portrait Lighting",
-    "sample2Desc": "Balance uneven lighting on faces for a better look.",
+    "sample1Title": "Portrait Face Shadow",
+    "sample1Desc": "Remove harsh shadows from faces caused by sunlight or hats.",
+    "sample2Title": "Product Photography",
+    "sample2Desc": "Clean up distracting cast shadows to make products look professional.",
+    "sample3Title": "Document Scan",
+    "sample3Desc": "Remove phone shadows from photos of documents and paper.",
     "seeSamplesBtn": "See Samples",
     "howToUseBtn": "Learn How to Use",
     "settingStrengthDesc": "Adjusts the intensity of shadow removal. Higher values remove more shadow but may affect local contrast.",

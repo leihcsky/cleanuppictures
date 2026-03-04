@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, SwatchIcon, SunIcon, FaceSmileIcon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, SwatchIcon, SunIcon, FaceSmileIcon, HomeIcon, CurrencyDollarIcon, Squares2X2Icon } from '@heroicons/react/24/outline'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
@@ -86,34 +86,94 @@ export default function Header({
             <Bars3Icon className="h-6 w-6" aria-hidden="true" />
           </button>
         </div>
-        <div className="hidden lg:flex lg:gap-x-8">
+        <div className="hidden lg:flex lg:gap-x-8 items-center">
           <Link
-             href={getLinkHref(locale, 'remove-color')}
-             onClick={() => checkPageAndLoading('remove-color')}
-             className="text-sm font-semibold leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-1.5">
-             <SwatchIcon className="w-4 h-4" />
-             {menuText.header3}
+             href={getLinkHref(locale, '')}
+             onClick={() => checkLocalAndLoading(locale)}
+             className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
+             <HomeIcon className="w-5 h-5" />
+             {menuText.home}
            </Link>
+
+          <Menu as="div" className="relative inline-block text-left">
+            <div>
+              <Menu.Button className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-transparent py-2 text-base font-medium text-slate-700 hover:text-primary-600 transition-colors items-center">
+                <Squares2X2Icon className="w-5 h-5" />
+                {menuText.tools}
+                <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-400" aria-hidden="true" />
+              </Menu.Button>
+            </div>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items className="absolute left-0 z-40 mt-2 w-56 origin-top-left divide-y divide-gray-100 rounded-xl bg-white/90 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className="py-1 p-1">
+                  <Menu.Item>
+                    {({ active }) => (
+                      <Link
+                        href={getLinkHref(locale, 'remove-shadow')}
+                        onClick={() => checkPageAndLoading('remove-shadow')}
+                        className={`${
+                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
+                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
+                      >
+                        <SunIcon className="w-5 h-5" />
+                        {menuText.header1}
+                      </Link>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <Link
+                        href={getLinkHref(locale, 'remove-emoji')}
+                        onClick={() => checkPageAndLoading('remove-emoji')}
+                        className={`${
+                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
+                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
+                      >
+                        <FaceSmileIcon className="w-5 h-5" />
+                        {menuText.header2}
+                      </Link>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                     {({ active }) => (
+                       <Link
+                         href={getLinkHref(locale, 'remove-color')}
+                         onClick={() => checkPageAndLoading('remove-color')}
+                         className={`${
+                           active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
+                         } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
+                       >
+                         <SwatchIcon className="w-5 h-5" />
+                         {menuText.header3}
+                       </Link>
+                     )}
+                   </Menu.Item>
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
+
           <Link
-            href={getLinkHref(locale, 'remove-shadow')}
-            onClick={() => checkPageAndLoading('remove-shadow')}
-            className="text-sm font-semibold leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-1.5">
-            <SunIcon className="w-4 h-4" />
-            {menuText.header1}
-          </Link>
-          <Link
-            href={getLinkHref(locale, 'remove-emoji')}
-            onClick={() => checkPageAndLoading('remove-emoji')}
-            className="text-sm font-semibold leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-1.5">
-            <FaceSmileIcon className="w-4 h-4" />
-            {menuText.header2}
+            href={getLinkHref(locale, 'pricing')}
+            onClick={() => checkPageAndLoading('pricing')}
+            className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
+            <CurrencyDollarIcon className="w-5 h-5" />
+            {menuText.pricing}
           </Link>
         </div>
         <div className="hidden lg:flex lg:items-center lg:gap-4">
           <Menu as="div" className="relative inline-block text-left z-30">
             <div>
               <Menu.Button
-                className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm">
+                className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-base font-medium text-slate-700 hover:bg-white transition-all shadow-sm">
                 <GlobeAltIcon className="w-5 h-5 text-slate-500" />{locale == 'default' ? 'EN' : locale.toUpperCase()}
                 <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-500" aria-hidden="true" />
               </Menu.Button>
@@ -193,26 +253,49 @@ export default function Header({
             <div className="divide-y divide-gray-500/10">
               <div className="space-y-2 py-6">
                  <Link
+                   href={getLinkHref(locale, '')}
+                   onClick={() => checkLocalAndLoading(locale)}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
+                   <HomeIcon className="w-5 h-5" />
+                   {menuText.home}
+                 </Link>
+
+                 <div className="text-base font-semibold leading-7 text-slate-500 pt-4 pb-2 px-1 flex items-center gap-2">
+                    <Squares2X2Icon className="w-5 h-5" />
+                    {menuText.tools}
+                 </div>
+
+                 <Link
+                   href={getLinkHref(locale, 'remove-shadow')}
+                   onClick={() => checkPageAndLoading('remove-shadow')}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
+                   <SunIcon className="w-5 h-5" />
+                   {menuText.header1}
+                 </Link>
+                 <Link
+                   href={getLinkHref(locale, 'remove-emoji')}
+                   onClick={() => checkPageAndLoading('remove-emoji')}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
+                   <FaceSmileIcon className="w-5 h-5" />
+                   {menuText.header2}
+                 </Link>
+                 <Link
                    href={getLinkHref(locale, 'remove-color')}
                    onClick={() => checkPageAndLoading('remove-color')}
-                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
                    <SwatchIcon className="w-5 h-5" />
                    {menuText.header3}
                  </Link>
-                <Link
-                  href={getLinkHref(locale, 'remove-shadow')}
-                  onClick={() => checkPageAndLoading('remove-shadow')}
-                  className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
-                  <SunIcon className="w-5 h-5" />
-                  {menuText.header1}
-                </Link>
-                <Link
-                  href={getLinkHref(locale, 'remove-emoji')}
-                  onClick={() => checkPageAndLoading('remove-emoji')}
-                  className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
-                  <FaceSmileIcon className="w-5 h-5" />
-                  {menuText.header2}
-                </Link>
+
+                 <div className="border-t border-gray-100 my-2"></div>
+
+                 <Link
+                   href={getLinkHref(locale, 'pricing')}
+                   onClick={() => checkPageAndLoading('pricing')}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
+                   <CurrencyDollarIcon className="w-5 h-5" />
+                   {menuText.pricing}
+                 </Link>
                 {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
                   <div className="pt-4 mt-4 border-t border-gray-100">
                     <LoginButton

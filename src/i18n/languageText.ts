@@ -80,6 +80,7 @@ export const getToolPageText = async () => {
     refineTip: tTool('refineTip'),
     autoRefineTip: tTool('autoRefineTip'),
     promptMask: tTool('promptMask'),
+    processFailed: tTool('processFailed'),
   }
 }
 
@@ -128,6 +129,10 @@ export const getRemoveShadowPageText = async () => {
     sample1Desc: tPage('sample1Desc'),
     sample2Title: tPage('sample2Title'),
     sample2Desc: tPage('sample2Desc'),
+    // @ts-ignore
+    sample3Title: tPage('sample3Title'),
+    // @ts-ignore
+    sample3Desc: tPage('sample3Desc'),
     seeSamplesBtn: tPage('seeSamplesBtn'),
     howToUseBtn: tPage('howToUseBtn'),
     settingStrengthDesc: tPage('settingStrengthDesc'),
@@ -434,6 +439,9 @@ export const getMenuText = async () => {
     header1: tMenu('header1'),
     header2: tMenu('header2'),
     header3: tMenu('header3'),
+    home: tMenu('home'),
+    tools: tMenu('tools'),
+    pricing: tMenu('pricing'),
     footerLegal: tMenu('footerLegal'),
     footerLegal0: tMenu('footerLegal0'),
     footerLegal1: tMenu('footerLegal1'),

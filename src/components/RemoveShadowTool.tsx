@@ -26,7 +26,7 @@ export default function RemoveShadowTool({
   const [strength, setStrength] = useState<number>(90); // 0-100
   const [downloadFormat, setDownloadFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [sceneType, setSceneType] = useState<'general' | 'building' | 'portrait' | 'object'>('general');
+  const [sceneType, setSceneType] = useState<'general' | 'person' | 'building' | 'portrait' | 'object'>('general');
   const [aggressive, setAggressive] = useState<boolean>(true);
   const [bias, setBias] = useState<number>(60);
   const [extreme, setExtreme] = useState<boolean>(true);
@@ -102,22 +102,31 @@ export default function RemoveShadowTool({
   // SAMPLES
   const SAMPLES = [
     {
-      id: 'building',
-      title: pageText.sample1Title || 'Building Shadow',
-      desc: pageText.sample1Desc || 'Reduce harsh shadows on building facades.',
-      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg', 
-      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-result.png',
-      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg',
-      settings: { strength: 80, aggressive: true }
+      id: 'portrait',
+      title: pageText.sample1Title || 'Portrait Face Shadow',
+      desc: pageText.sample1Desc || 'Remove harsh shadows from faces caused by sunlight or hats.',
+      beforeUrl: '/images/samples/removeshadow/sample-portrait-before.jpg', 
+      afterUrl: '/images/samples/removeshadow/sample-portrait-after.jpg',
+      url: '/images/samples/removeshadow/sample-portrait-before.jpg',
+      settings: { strength: 85, aggressive: false }
     },
     {
-      id: 'portrait',
-      title: pageText.sample2Title || 'Portrait Lighting',
-      desc: pageText.sample2Desc || 'Balance uneven lighting on faces.',
-      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
-      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-result.png',
-      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
-      settings: { strength: 60, aggressive: false }
+      id: 'product',
+      title: pageText.sample2Title || 'Product Photography',
+      desc: pageText.sample2Desc || 'Clean up distracting cast shadows to make products look professional.',
+      beforeUrl: '/images/samples/removeshadow/sample-product-before.jpg',
+      afterUrl: '/images/samples/removeshadow/sample-product-after.jpg',
+      url: '/images/samples/removeshadow/sample-product-before.jpg',
+      settings: { strength: 95, aggressive: true }
+    },
+    {
+      id: 'document',
+      title: pageText.sample3Title || 'Document Scan',
+      desc: pageText.sample3Desc || 'Remove phone shadows from photos of documents and paper.',
+      beforeUrl: '/images/samples/removeshadow/sample-document-before.jpg',
+      afterUrl: '/images/samples/removeshadow/sample-document-after.jpg',
+      url: '/images/samples/removeshadow/sample-document-before.jpg',
+      settings: { strength: 90, aggressive: true }
     }
   ];
 
@@ -690,7 +699,8 @@ export default function RemoveShadowTool({
     if (!originalImage || !canvasRef.current) return;
     
     // Get mask if exists
-    let maskDataUrl = null;
+    let kieMaskDataUrl = null;
+    let standardMaskDataUrl = null;
     let currentMaskData = maskCanvasData;
     
     if (!currentMaskData && maskCanvasRef.current) {
@@ -712,32 +722,75 @@ export default function RemoveShadowTool({
          }
 
          if (hasPixels) {
-              // Create a binary mask (white for mask, black for background)
-              const mCanvas = document.createElement('canvas');
-              mCanvas.width = originalImage.naturalWidth;
-              mCanvas.height = originalImage.naturalHeight;
-              const mCtx = mCanvas.getContext('2d');
-              if (mCtx) {
-                  mCtx.fillStyle = 'black';
-                  mCtx.fillRect(0, 0, mCanvas.width, mCanvas.height);
+              const w = originalImage.naturalWidth;
+              const h = originalImage.naturalHeight;
+              
+              // 1. Create KIE Mask (White=Preserve, Black=Modify)
+              const kieCanvas = document.createElement('canvas');
+              kieCanvas.width = w;
+              kieCanvas.height = h;
+              const kieCtx = kieCanvas.getContext('2d');
+              
+              // 2. Create Standard Mask (Black=Preserve, White=Modify)
+              const stdCanvas = document.createElement('canvas');
+              stdCanvas.width = w;
+              stdCanvas.height = h;
+              const stdCtx = stdCanvas.getContext('2d');
+
+              if (kieCtx && stdCtx) {
+                  // Initialize backgrounds
+                  kieCtx.fillStyle = 'white'; // KIE Preserve
+                  kieCtx.fillRect(0, 0, w, h);
+                  
+                  stdCtx.fillStyle = 'black'; // Standard Preserve
+                  stdCtx.fillRect(0, 0, w, h);
                   
                   const srcData = currentMaskData.data;
-                  const binData = mCtx.createImageData(mCanvas.width, mCanvas.height);
-                  const dst = binData.data;
+                  
+                  // Create ImageData for pixel manipulation
+                  const kieImgData = kieCtx.createImageData(w, h);
+                  const stdImgData = stdCtx.createImageData(w, h);
+                  const kieDst = kieImgData.data;
+                  const stdDst = stdImgData.data;
                   
                   for (let i = 0; i < srcData.length; i += 4) {
                       const alpha = srcData[i + 3];
                       if (alpha > 0) {
-                          dst[i] = 255;     // R
-                          dst[i + 1] = 255; // G
-                          dst[i + 2] = 255; // B
-                          dst[i + 3] = 255; // A
+                          // Painted Area (Modify)
+                          
+                          // KIE: Black
+                          kieDst[i] = 0;     // R
+                          kieDst[i + 1] = 0; // G
+                          kieDst[i + 2] = 0; // B
+                          kieDst[i + 3] = 255; // A
+                          
+                          // Standard: White
+                          stdDst[i] = 255;   // R
+                          stdDst[i + 1] = 255; // G
+                          stdDst[i + 2] = 255; // B
+                          stdDst[i + 3] = 255; // A
                       } else {
-                          dst[i + 3] = 255; // A (opaque black)
+                          // Unpainted Area (Preserve)
+                          
+                          // KIE: White
+                          kieDst[i] = 255;
+                          kieDst[i + 1] = 255;
+                          kieDst[i + 2] = 255;
+                          kieDst[i + 3] = 255;
+                          
+                          // Standard: Black
+                          stdDst[i] = 0;
+                          stdDst[i + 1] = 0;
+                          stdDst[i + 2] = 0;
+                          stdDst[i + 3] = 255;
                       }
                   }
-                  mCtx.putImageData(binData, 0, 0);
-                  maskDataUrl = mCanvas.toDataURL('image/png');
+                  
+                  kieCtx.putImageData(kieImgData, 0, 0);
+                  stdCtx.putImageData(stdImgData, 0, 0);
+                  
+                  kieMaskDataUrl = kieCanvas.toDataURL('image/png');
+                  standardMaskDataUrl = stdCanvas.toDataURL('image/png');
               }
          }
     }
@@ -753,7 +806,8 @@ export default function RemoveShadowTool({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageDataUrl: src,
-          maskDataUrl,
+          maskDataUrl: standardMaskDataUrl, // Send standard mask as default
+          kieMaskDataUrl,                   // Send KIE mask specifically
           scene: sceneType
         })
       });
@@ -767,7 +821,139 @@ export default function RemoveShadowTool({
           if (canvasRef.current) {
             const ctx = canvasRef.current.getContext('2d');
             if (ctx) {
-                ctx.drawImage(img, 0, 0);
+                const w = canvasRef.current.width;
+                const h = canvasRef.current.height;
+
+                // 1. Get Base Image Data (Current Canvas State)
+                const baseImageData = ctx.getImageData(0, 0, w, h);
+                
+                // 2. Get AI Result Data
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = w;
+                tempCanvas.height = h;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                if (tempCtx) {
+                    tempCtx.drawImage(img, 0, 0, w, h);
+                    const aiImageData = tempCtx.getImageData(0, 0, w, h);
+                    
+                    // 3. Composite if mask exists
+                    // This ensures we ONLY update the masked area, preserving original pixels elsewhere (e.g. faces)
+                    if (currentMaskData && currentMaskData.width === w && currentMaskData.height === h) {
+                         const outputData = ctx.createImageData(w, h);
+                         const baseData = baseImageData.data;
+                         const aiData = aiImageData.data;
+                         
+                         // Enhanced Mask Processing for Seamless Blending
+                         // 1. Dilation: Expand the mask to cover potential edge artifacts
+                         // 2. Feathering: Soften the edge for smooth transition
+                         
+                         const maskCanvas = document.createElement('canvas');
+                         maskCanvas.width = w;
+                         maskCanvas.height = h;
+                         const maskCtx = maskCanvas.getContext('2d');
+                         let maskData = currentMaskData.data;
+
+                         if (maskCtx) {
+                            // --- Step 1: Create Solid Core Mask ---
+                            const solidMaskImg = maskCtx.createImageData(w, h);
+                            const solidData = solidMaskImg.data;
+                            const srcData = currentMaskData.data;
+                            
+                            for (let i = 0; i < srcData.length; i += 4) {
+                                // Threshold: treat any painted pixel (even faint) as part of the mask
+                                if (srcData[i + 3] > 0) { 
+                                    solidData[i] = 255;     
+                                    solidData[i + 1] = 255; 
+                                    solidData[i + 2] = 255; 
+                                    solidData[i + 3] = 255; 
+                                } else {
+                                    solidData[i + 3] = 0;
+                                }
+                            }
+                            maskCtx.putImageData(solidMaskImg, 0, 0);
+                            
+                            // --- Step 2: Apply Feathering (Blur) ONLY ---
+                            // NO Dilation/Expansion. We strictly respect the user's brush area.
+                            // We only soften the edges to blend smoothly.
+                            
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = w;
+                            tempCanvas.height = h;
+                            const tempCtx = tempCanvas.getContext('2d');
+                            
+                            if (tempCtx) {
+                                // Calculate blur radius based on image size
+                                // Moderate blur for smooth edge without excessive bleeding
+                                const maxDim = Math.max(w, h);
+                                const blurRadius = Math.max(2, Math.min(10, Math.round(maxDim * 0.005))); 
+                                
+                                tempCtx.filter = `blur(${blurRadius}px)`;
+                                tempCtx.drawImage(maskCanvas, 0, 0);
+                                
+                                // Get the feathered mask data
+                                maskData = tempCtx.getImageData(0, 0, w, h).data;
+                            }
+                         }
+                         
+                         const outData = outputData.data;
+
+                         // --- Step 3: Global Color Correction (Histogram Matching) ---
+                         // Calculate the average color shift between AI result and Original Image in UNMASKED areas.
+                         // This fixes global VAE color shifts (e.g. slight brightness/tint differences) that cause the patch to stand out.
+                         
+                         let diffR = 0, diffG = 0, diffB = 0;
+                         let pixelCount = 0;
+                         const stride = 4; // Sample every 4th pixel for performance
+                         
+                         for (let i = 0; i < baseData.length; i += 4 * stride) {
+                             // Check if this pixel is definitely UNMASKED in the user's original mask
+                             // We use the original srcData to be safe.
+                             // We want to sample pixels that are far from the mask to get true background color.
+                             
+                             if (currentMaskData.data[i + 3] === 0) {
+                                 diffR += (baseData[i] - aiData[i]);
+                                 diffG += (baseData[i + 1] - aiData[i + 1]);
+                                 diffB += (baseData[i + 2] - aiData[i + 2]);
+                                 pixelCount++;
+                             }
+                         }
+                         
+                         if (pixelCount > 0) {
+                             diffR /= pixelCount;
+                             diffG /= pixelCount;
+                             diffB /= pixelCount;
+                         }
+
+                         for (let i = 0; i < baseData.length; i += 4) {
+                             // Get Alpha from the feathered mask
+                             let alpha = maskData[i + 3] / 255.0;
+                             
+                             // Apply Color Correction to AI pixel
+                             // AI_Corrected = AI + Diff (where Diff = Base - AI) -> AI_Corrected approaches Base
+                             const aiR = Math.min(255, Math.max(0, aiData[i] + diffR));
+                             const aiG = Math.min(255, Math.max(0, aiData[i + 1] + diffG));
+                             const aiB = Math.min(255, Math.max(0, aiData[i + 2] + diffB));
+                             
+                             outData[i] = baseData[i] * (1 - alpha) + aiR * alpha;
+                             outData[i + 1] = baseData[i + 1] * (1 - alpha) + aiG * alpha;
+                             outData[i + 2] = baseData[i + 2] * (1 - alpha) + aiB * alpha;
+                             outData[i + 3] = 255; 
+                         }
+                         
+                         // 4. Put Result
+                         ctx.putImageData(outputData, 0, 0);
+                    } else {
+                         // No mask or size mismatch, just draw AI result
+                         ctx.clearRect(0, 0, w, h);
+                         ctx.drawImage(img, 0, 0, w, h);
+                    }
+                } else {
+                    // Fallback
+                     ctx.clearRect(0, 0, w, h);
+                     ctx.drawImage(img, 0, 0, w, h);
+                }
+                
                 // Clear mask after successful refine
                 handleClearMask();
             }
@@ -776,16 +962,18 @@ export default function RemoveShadowTool({
         };
         img.onerror = () => {
            setIsProcessing(false);
-           alert('Failed to load result image.');
+           alert(toolText?.processFailed || 'Processing failed.');
         };
         img.src = json.output_url;
       } else {
         setIsProcessing(false);
-        alert('AI refine failed: ' + (json.msg || 'Unknown error'));
+        console.error('AI refine failed:', json.msg);
+        alert(toolText?.processFailed || 'Processing failed.');
       }
     } catch (e) {
       setIsProcessing(false);
-      alert('AI refine failed.');
+      console.error('AI refine exception:', e);
+      alert(toolText?.processFailed || 'Processing failed.');
     }
   };
 
@@ -901,7 +1089,7 @@ export default function RemoveShadowTool({
              <div ref={workspaceRef} className={`mx-auto flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${!imageSrc ? 'max-w-3xl bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-8 cursor-pointer hover:shadow-2xl' : 'max-w-[90rem] bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-4 lg:p-8 min-h-[420px]'}`} onDrop={handleDrop} onDragOver={handleDragOver} onClick={() => { if (!imageSrc) fileInputRef.current?.click() }}>
                 {!imageSrc ? (
                   <div className="w-full max-w-2xl mx-auto">
-                    <div className="relative flex flex-col items-center justify-center gap-8 p-12 md:p-20 rounded-3xl border-2 border-dashed border-slate-300 hover:border-primary-400 hover:bg-white/50 transition-all duration-300 group overflow-hidden bg-white/30">
+                    <div className="relative flex flex-col items-center justify-center gap-8 p-12 md:p-20 rounded-3xl border-2 border-dashed border-slate-300 hover:border-primary-400 hover:bg-white/50 transition-all duration-300 group overflow-visible bg-white/30">
                       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
                       <div className="relative z-10 flex flex-col items-center gap-6">
                         <div className="flex items-center justify-center w-24 h-24 rounded-full bg-white text-primary-600 shadow-md ring-1 ring-slate-900/5 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
@@ -926,7 +1114,7 @@ export default function RemoveShadowTool({
                 ) : (
                   <div className="w-full flex flex-col gap-6">
                      {/* Toolbar */}
-                     <div className="flex items-center gap-6 bg-white/80 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg border border-white/20 sticky top-24 z-[60] flex-nowrap overflow-x-hidden overflow-y-visible whitespace-nowrap min-h-[56px]">
+                     <div className="flex items-center gap-6 bg-white/80 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg border border-white/20 sticky top-24 z-[60] flex-nowrap overflow-visible whitespace-nowrap min-h-[56px]">
                         <div className="flex items-center gap-6 flex-nowrap">
                             {/* Brush Tool */}
                             <div className="flex items-center gap-6 relative whitespace-nowrap shrink-0">
@@ -962,17 +1150,21 @@ export default function RemoveShadowTool({
                             <div className="flex items-center gap-4 border-l pl-6 border-slate-200/60 relative whitespace-nowrap shrink-0">
                                 <Menu as="div" className="relative inline-block text-left">
                                   <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200">
-                                    {sceneType === 'general' ? 'General' : sceneType === 'building' ? 'Building' : sceneType === 'portrait' ? 'Portrait' : 'Object'}
+                                    {sceneType === 'general' ? 'General' : 
+                                     sceneType === 'person' ? 'Person' :
+                                     sceneType === 'portrait' ? 'Portrait' :
+                                     sceneType === 'building' ? 'Building' : 
+                                     'Object'}
                                     <ChevronDownIcon className="h-3 w-3 text-slate-500" aria-hidden="true" />
                                   </Menu.Button>
                                   <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
-                                    <Menu.Items className="absolute left-0 z-30 mt-2 w-32 origin-top-left divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                    <Menu.Items className="absolute left-0 z-[70] mt-2 w-40 origin-top-left divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                       <div className="py-1">
-                                        {['general', 'building', 'portrait', 'object'].map(type => (
+                                        {['general', 'person', 'portrait', 'building', 'object'].map(type => (
                                           <Menu.Item key={type}>
                                             {({ active }) => (
                                               <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm capitalize`} onClick={() => setSceneType(type as any)}>
-                                                {type}
+                                                {type === 'person' ? 'Person (Body)' : type === 'portrait' ? 'Portrait (Face)' : type}
                                               </button>
                                             )}
                                           </Menu.Item>
