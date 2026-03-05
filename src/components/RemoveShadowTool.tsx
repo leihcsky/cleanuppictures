@@ -4,7 +4,7 @@ import Footer from "~/components/Footer";
 import { useCommonContext } from "~/context/common-context";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Script from "next/script";
-import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
 import { Menu, Transition } from "@headlessui/react";
@@ -47,6 +47,7 @@ export default function RemoveShadowTool({
   // Undo/Redo State
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
+  const [showReference, setShowReference] = useState(true);
 
   // Debounce
   const [debouncedStrength, setDebouncedStrength] = useState(strength);
@@ -55,15 +56,32 @@ export default function RemoveShadowTool({
     return () => clearTimeout(handler);
   }, [strength]);
 
-  // Initialize canvas with original image when loaded to prevent layout shift
+  const drawImageToCanvases = useCallback((img: HTMLImageElement) => {
+    if (!canvasRef.current || !maskCanvasRef.current) return false;
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return false;
+    const canvas = canvasRef.current;
+    const mask = maskCanvasRef.current;
+    canvas.width = w;
+    canvas.height = h;
+    mask.width = w;
+    mask.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    return true;
+  }, []);
+
   useEffect(() => {
-    if (originalImage && canvasRef.current) {
-        canvasRef.current.width = originalImage.naturalWidth;
-        canvasRef.current.height = originalImage.naturalHeight;
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) ctx.drawImage(originalImage, 0, 0);
-    }
-  }, [originalImage]);
+    if (!originalImage) return;
+    if (drawImageToCanvases(originalImage)) return;
+    const timer = window.setTimeout(() => {
+      drawImageToCanvases(originalImage);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [originalImage, imageSrc, drawImageToCanvases]);
 
 
 
@@ -79,6 +97,7 @@ export default function RemoveShadowTool({
   const howToUseRef = useRef<HTMLDivElement | null>(null);
   const controlsBarRef = useRef<HTMLDivElement | null>(null);
   const cursorRef = useRef<HTMLDivElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   
   const [controlsAffixed, setControlsAffixed] = useState(false);
   const [controlsAffixPos, setControlsAffixPos] = useState({ top: 0, left: 0 });
@@ -152,16 +171,6 @@ export default function RemoveShadowTool({
         if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
       }
       setMaskCanvasData(null);
-
-      // setIsProcessing(false); // Let applyShadowReduction handle this
-      setTimeout(() => {
-        if (workspaceRef.current) {
-            const yOffset = -80;
-            const element = workspaceRef.current;
-            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-            window.scrollTo({top: y, behavior: 'smooth'});
-        }
-      }, 100);
     };
     img.onerror = () => {
         setIsProcessing(false);
@@ -181,27 +190,12 @@ export default function RemoveShadowTool({
     img.onload = () => {
       setOriginalImage(img);
       setImageSrc(url);
-      setStrength(90); // Reset strength
-      
-      // Initialize Canvas with original image immediately to prevent layout shift
-      // Handled by useEffect now
-
-
-      // Reset mask
+      setStrength(90);
       if (maskCanvasRef.current) {
         const ctx = maskCanvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
       }
       setMaskCanvasData(null);
-      // setIsProcessing(false); // Let applyShadowReduction handle this
-      setTimeout(() => {
-        if (workspaceRef.current) {
-            const yOffset = -80;
-            const element = workspaceRef.current;
-            const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
-            window.scrollTo({top: y, behavior: 'smooth'});
-        }
-      }, 100);
     };
     img.src = url;
   }, []);
@@ -210,12 +204,18 @@ export default function RemoveShadowTool({
     const file = e.target.files?.[0];
     if (file) processFile(file);
   };
+
   const handleDrop = (e) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     const file = e.dataTransfer.files?.[0];
     if (file) processFile(file);
   };
-  const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
 
   useEffect(() => {
     const handlePaste = (e) => {
@@ -240,7 +240,7 @@ export default function RemoveShadowTool({
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const prev = zoom;
-    const next = clamp(prev * factor, 1, 8);
+    const next = clamp(prev * factor, 0.2, 8);
     if (anchorEvent) {
       const inBounds = anchorEvent.clientX >= rect.left && anchorEvent.clientX <= rect.right && anchorEvent.clientY >= rect.top && anchorEvent.clientY <= rect.bottom;
       const ax = inBounds ? (anchorEvent.clientX - rect.left) / prev : (rect.width / 2) / prev;
@@ -273,6 +273,17 @@ export default function RemoveShadowTool({
     setZoom(1); setPanX(0); setPanY(0);
   };
 
+  const handleWheelZoom = (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.08 : 0.92;
+    handleZoom(factor, { clientX: e.clientX, clientY: e.clientY });
+  };
+
+  const getEffectiveBrushSize = useCallback((baseSize: number, scaleX: number, scaleY: number) => {
+    const scale = (scaleX + scaleY) / 2;
+    return baseSize * scale;
+  }, []);
+
   // Painting Logic
   const handleDrawStart = (e) => {
     if (panMode) {
@@ -290,11 +301,7 @@ export default function RemoveShadowTool({
     const ctx = maskCanvasRef.current.getContext('2d');
     if (!ctx) return;
     
-    // Calculate adaptive brush size based on image dimensions
-    // Base scale on larger dimension to ensure visibility on high-res images
-    const maxDim = Math.max(originalImage.naturalWidth, originalImage.naturalHeight);
-    const adaptiveScale = Math.max(1, maxDim / 1000); 
-    const effectiveBrushSize = brushSize * adaptiveScale;
+    const effectiveBrushSize = getEffectiveBrushSize(brushSize, scaleX, scaleY);
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -644,16 +651,6 @@ export default function RemoveShadowTool({
     setIsProcessing(false);
   }, [originalImage, debouncedStrength, aggressive, bias, extreme, targetBright, maskCanvasData]);
 
-  // Initialize canvas with original image when loaded to prevent layout shift
-  useEffect(() => {
-    if (originalImage && canvasRef.current) {
-        canvasRef.current.width = originalImage.naturalWidth;
-        canvasRef.current.height = originalImage.naturalHeight;
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) ctx.drawImage(originalImage, 0, 0);
-    }
-  }, [originalImage]);
-
   // Remove auto-processing useEffect
   // useEffect(() => {
   //   if (!originalImage) return;
@@ -977,9 +974,29 @@ export default function RemoveShadowTool({
     }
   };
 
+  useEffect(() => {
+    if (originalImage && wrapperRef.current) {
+      const { naturalWidth: w, naturalHeight: h } = originalImage;
+      const wrapper = wrapperRef.current;
+      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+      const effectiveShowReference = showReference && isDesktop;
+      const availableWidth = effectiveShowReference ? wrapper.clientWidth * 0.58 : wrapper.clientWidth;
+      const availableHeight = wrapper.clientHeight;
+      const scaleX = (availableWidth - 24) / w;
+      const scaleY = (availableHeight - 24) / h;
+      const fitScale = Math.min(scaleX, scaleY, 1);
+      const initialZoom = Math.max(1, fitScale);
+      setZoom(initialZoom);
+      setPanX(0);
+      setPanY(0);
+    }
+  }, [originalImage, showReference]);
+
   const handleNewImage = () => {
     setImageSrc(null); setOriginalImage(null);
     setMaskCanvasData(null);
+    setZoom(1); setPanX(0); setPanY(0); setPanMode(false);
+    setShowReference(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
     // Reset mask canvas
     if (maskCanvasRef.current) {
@@ -1053,7 +1070,8 @@ export default function RemoveShadowTool({
         className="fixed pointer-events-none rounded-full border-2 border-sky-400 z-[100] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-150 opacity-0"
         style={{ width: 20, height: 20, left: 0, top: 0 }}
       />
-      <Header locale={locale} page={pageName} />
+      <input id="file-upload" name="file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleUpload} accept="image/png, image/jpeg, image/webp" />
+      {!imageSrc && <Header locale={locale} page={pageName} />}
       <main className="isolate bg-slate-50">
         <Script id="remove-shadow-ld" type="application/ld+json">
           {JSON.stringify({
@@ -1067,12 +1085,12 @@ export default function RemoveShadowTool({
         </Script>
         
         {/* Tool Section */}
-        <div className="relative pt-32 pb-16">
+        <div className={`relative transition-all duration-500 ${imageSrc ? 'pt-0 pb-0' : 'pt-32 pb-16'}`}>
            <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
              <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#ff80b5] to-[#9089fc] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]" style={{clipPath: 'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)'}} />
            </div>
            <div className="mx-auto max-w-7xl px-6 lg:px-8">
-             <div className="mx-auto max-w-5xl text-center mb-10">
+             <div className={`mx-auto max-w-5xl text-center mb-10 transition-all duration-500 ${imageSrc ? 'opacity-0 h-0 overflow-hidden mb-0 scale-95' : 'opacity-100 scale-100'}`}>
                 <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:whitespace-nowrap">{pageText.h1}</h1>
                 <p className="mt-6 text-lg leading-8 text-slate-600">{pageText.description}</p>
                 <div className="mt-8 flex items-center justify-center gap-x-6">
@@ -1085,230 +1103,264 @@ export default function RemoveShadowTool({
                 </div>
              </div>
 
-             {/* Workspace */}
-             <div ref={workspaceRef} className={`mx-auto flex flex-col items-center justify-center transition-all duration-500 ease-in-out ${!imageSrc ? 'max-w-3xl bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-8 cursor-pointer hover:shadow-2xl' : 'max-w-[90rem] bg-white/60 backdrop-blur-xl rounded-3xl border border-white/50 shadow-xl p-4 lg:p-8 min-h-[420px]'}`} onDrop={handleDrop} onDragOver={handleDragOver} onClick={() => { if (!imageSrc) fileInputRef.current?.click() }}>
-                {!imageSrc ? (
-                  <div className="w-full max-w-2xl mx-auto">
-                    <div className="relative flex flex-col items-center justify-center gap-8 p-12 md:p-20 rounded-3xl border-2 border-dashed border-slate-300 hover:border-primary-400 hover:bg-white/50 transition-all duration-300 group overflow-visible bg-white/30">
-                      <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-                      <div className="relative z-10 flex flex-col items-center gap-6">
-                        <div className="flex items-center justify-center w-24 h-24 rounded-full bg-white text-primary-600 shadow-md ring-1 ring-slate-900/5 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-                          </svg>
-                        </div>
-                        <div className="text-center space-y-3">
-                          <h2 className="text-2xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
-                          <p className="text-lg text-slate-600 max-w-lg mx-auto">{toolText.uploadDesc}</p>
-                          <p className="text-sm text-slate-400">{toolText.uploadSubDesc}</p>
-                        </div>
-                      </div>
-                      <div className="relative z-10 flex flex-col items-center gap-3">
-                         <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-white/80 px-4 py-1.5 rounded-full border border-slate-200/60 backdrop-blur-sm shadow-sm">
-                            <kbd className="font-sans font-semibold text-slate-500">Ctrl</kbd> <span className="text-slate-300">+</span> <kbd className="font-sans font-semibold text-slate-500">V</kbd> <span>to paste</span>
+             <div
+               ref={workspaceRef}
+              className={`mx-auto transition-all duration-700 ease-in-out ${
+                !imageSrc
+                  ? 'w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center'
+                  : 'w-full'
+              }`}
+               onDrop={handleDrop}
+               onDragOver={handleDragOver}
+             >
+               {!imageSrc ? (
+                 <>
+                   <div className="hidden lg:flex w-full aspect-video rounded-3xl bg-slate-900/5 border border-slate-200/60 shadow-inner items-center justify-center overflow-hidden relative group backdrop-blur-sm">
+                     <div className="absolute inset-0 bg-gradient-to-tr from-slate-100/50 to-white/30 opacity-50"></div>
+                     <div className="relative z-10 flex flex-col items-center gap-4 transition-transform duration-300 group-hover:scale-105">
+                       <div className="w-20 h-20 rounded-full bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center text-primary-500 ring-1 ring-slate-100">
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10 ml-1">
+                           <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" />
+                         </svg>
+                       </div>
+                       <p className="text-slate-500 font-medium bg-white/80 px-4 py-1.5 rounded-full shadow-sm text-sm backdrop-blur-md">Watch Demo</p>
+                     </div>
+                   </div>
+                   <div className="w-full max-w-xl mx-auto">
+                     <div
+                       className="relative flex flex-col items-center justify-center gap-6 p-10 rounded-3xl border-2 border-dashed border-slate-300 bg-white/40 backdrop-blur-md hover:border-primary-400 hover:bg-white/60 hover:shadow-xl hover:scale-[1.01] transition-all duration-300 cursor-pointer group"
+                       onClick={() => fileInputRef.current?.click()}
+                     >
+                       <div className="absolute inset-0 opacity-[0.03] pointer-events-none rounded-3xl" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+                       <div className="relative z-10 flex flex-col items-center gap-5">
+                         <div className="flex items-center justify-center w-20 h-20 rounded-full bg-white text-primary-500 shadow-md ring-1 ring-slate-900/5 group-hover:scale-110 group-hover:shadow-lg transition-all duration-300">
+                           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10">
+                             <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                           </svg>
                          </div>
-                      </div>
-                      <input id="file-upload" name="file-upload" type="file" className="sr-only" ref={fileInputRef} onChange={handleUpload} accept="image/png, image/jpeg, image/webp" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full flex flex-col gap-6">
-                     {/* Toolbar */}
-                     <div className="flex items-center gap-6 bg-white/80 backdrop-blur-md px-6 py-4 rounded-xl shadow-lg border border-white/20 sticky top-24 z-[60] flex-nowrap overflow-visible whitespace-nowrap min-h-[56px]">
-                        <div className="flex items-center gap-6 flex-nowrap">
-                            {/* Brush Tool */}
-                            <div className="flex items-center gap-6 relative whitespace-nowrap shrink-0">
-                                <div className="flex items-center gap-4">
-                                    <PaintBrushIcon className="w-5 h-5 text-slate-500" />
-                                    <input type="range" min="1" max="100" value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} className="w-32 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500 shrink-0 focus:outline-none" title="Brush Size" />
-                                    
-                                    {/* Undo/Redo Controls */}
-                                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                                        <button 
-                                            onClick={handleUndo} 
-                                            disabled={historyStep < 0}
-                                            className={`p-1.5 rounded-md transition-colors ${historyStep < 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}
-                                            title="Undo"
-                                        >
-                                            <ArrowUturnLeftIcon className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={handleRedo} 
-                                            disabled={historyStep >= history.length - 1}
-                                            className={`p-1.5 rounded-md transition-colors ${historyStep >= history.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}
-                                            title="Redo"
-                                        >
-                                            <ArrowUturnRightIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                    
-                                    <button onClick={handleClearMask} className="text-xs text-red-600 hover:text-red-700 font-medium px-3 py-1.5 bg-red-50 rounded-md ml-2">Clear Mask</button>
-                                </div>
-                            </div>
-
-                            {/* Scene Selector */}
-                            <div className="flex items-center gap-4 border-l pl-6 border-slate-200/60 relative whitespace-nowrap shrink-0">
-                                <Menu as="div" className="relative inline-block text-left">
-                                  <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors border border-slate-200">
-                                    {sceneType === 'general' ? 'General' : 
-                                     sceneType === 'person' ? 'Person' :
-                                     sceneType === 'portrait' ? 'Portrait' :
-                                     sceneType === 'building' ? 'Building' : 
-                                     'Object'}
-                                    <ChevronDownIcon className="h-3 w-3 text-slate-500" aria-hidden="true" />
-                                  </Menu.Button>
-                                  <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
-                                    <Menu.Items className="absolute left-0 z-[70] mt-2 w-40 origin-top-left divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                      <div className="py-1">
-                                        {['general', 'person', 'portrait', 'building', 'object'].map(type => (
-                                          <Menu.Item key={type}>
-                                            {({ active }) => (
-                                              <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm capitalize`} onClick={() => setSceneType(type as any)}>
-                                                {type === 'person' ? 'Person (Body)' : type === 'portrait' ? 'Portrait (Face)' : type}
-                                              </button>
-                                            )}
-                                          </Menu.Item>
-                                        ))}
-                                      </div>
-                                    </Menu.Items>
-                                  </Transition>
-                                </Menu>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 border-l pl-3 border-slate-200/60 relative whitespace-nowrap shrink-0 ml-auto">
-                                <button onClick={() => handleGenerate()} className="inline-flex items-center gap-1.5 rounded-full px-6 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md">
-                                  <SparklesIcon className="w-4 h-4" />
-                                  Remove Shadow
-                                </button>
-                            </div>
-                        </div>
+                         <div className="text-center space-y-2">
+                           <h2 className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
+                           <p className="text-sm text-slate-600 max-w-xs mx-auto leading-relaxed">{toolText.uploadDesc}</p>
+                           <p className="text-xs text-slate-400">{toolText.uploadSubDesc}</p>
+                         </div>
+                       </div>
+                       <div className="relative z-10 flex flex-col items-center gap-3">
+                         <div className="flex items-center gap-1.5 text-[10px] text-slate-400 bg-white/80 px-3 py-1.5 rounded-full border border-slate-200/60 backdrop-blur-sm shadow-sm">
+                           <kbd className="font-sans font-semibold text-slate-500">Ctrl</kbd> <span className="text-slate-300">+</span> <kbd className="font-sans font-semibold text-slate-500">V</kbd> <span>to paste</span>
+                         </div>
+                       </div>
                      </div>
-                     {tooltipState.visible && (
-                      <div className="fixed z-[200] pointer-events-none rounded-md bg-white shadow-lg ring-1 ring-slate-900/10 px-3 py-2 text-xs text-slate-700 max-w-[280px] whitespace-normal break-words" style={{ top: tooltipState.y, left: tooltipState.x }}>
-                        {tooltipState.text}
-                      </div>
+                   </div>
+                 </>
+               ) : (
+                <div className="fixed inset-0 z-[99999] bg-white flex items-center justify-center p-4 lg:p-6 animate-in fade-in duration-300">
+                 <div className="w-full max-w-[1820px] h-[min(920px,calc(100vh-96px))] bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-2xl flex flex-col pointer-events-auto">
+                 <div className="min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center gap-3 px-3 lg:px-6 py-2 shrink-0 z-[2000] shadow-md overflow-visible">
+                    <div className="flex items-center gap-4 flex-wrap">
+                       <button
+                         onClick={handleNewImage}
+                         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                       >
+                         <ChevronLeftIcon className="w-5 h-5" />
+                        <span>Exit Editor</span>
+                       </button>
+                       <button
+                         onClick={() => fileInputRef.current?.click()}
+                         className="inline-flex items-center text-slate-700 hover:text-slate-900 font-medium px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                       >
+                         Upload New
+                       </button>
+                       <div className="h-6 w-px bg-slate-200 hidden lg:block"></div>
+                       <button
+                         onClick={() => setShowReference(!showReference)}
+                         className={`hidden lg:inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${showReference ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                       >
+                         <Squares2X2Icon className="w-4 h-4" />
+                         <span>Reference</span>
+                       </button>
+                     </div>
+                    <div className="flex items-center gap-3 lg:gap-5 ml-auto flex-wrap">
+                         <PaintBrushIcon className="w-5 h-5 text-slate-400" />
+                         <div className="flex flex-col gap-1 w-24 lg:w-32">
+                           <input
+                             type="range"
+                             min="1"
+                             max="100"
+                             value={brushSize}
+                             onChange={(e) => setBrushSize(Number(e.target.value))}
+                             className="h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer accent-primary-500 hover:accent-primary-600 focus:outline-none"
+                             title={`Brush Size: ${brushSize}`}
+                           />
+                         </div>
+                      <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                         <button
+                           onClick={handleUndo}
+                           disabled={historyStep < 0}
+                           className={`p-1.5 rounded-md transition-colors ${historyStep < 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}
+                           title="Undo (Ctrl+Z)"
+                         >
+                           <ArrowUturnLeftIcon className="w-4 h-4" />
+                         </button>
+                         <button
+                           onClick={handleRedo}
+                           disabled={historyStep >= history.length - 1}
+                           className={`p-1.5 rounded-md transition-colors ${historyStep >= history.length - 1 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}
+                           title="Redo (Ctrl+Y)"
+                         >
+                           <ArrowUturnRightIcon className="w-4 h-4" />
+                         </button>
+                       </div>
+                       <button onClick={handleClearMask} className="text-xs text-red-600 hover:text-red-700 font-medium px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-md transition-colors whitespace-nowrap">
+                         Clear
+                       </button>
+                      <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
+                         <Menu as="div" className="relative inline-block text-left">
+                           <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                             {sceneType === 'general' ? 'General' :
+                              sceneType === 'person' ? 'Person' :
+                              sceneType === 'portrait' ? 'Portrait' :
+                              sceneType === 'building' ? 'Building' :
+                              'Object'}
+                             <ChevronDownIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                           </Menu.Button>
+                           <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
+                            <Menu.Items className="absolute right-0 z-[3000] mt-2 w-40 origin-top-right divide-y divide-slate-100 rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                               <div className="py-1">
+                                 {['general', 'person', 'portrait', 'building', 'object'].map(type => (
+                                   <Menu.Item key={type}>
+                                     {({ active }) => (
+                                       <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm capitalize`} onClick={() => setSceneType(type as any)}>
+                                         {type === 'person' ? 'Person (Body)' : type === 'portrait' ? 'Portrait (Face)' : type}
+                                       </button>
+                                     )}
+                                   </Menu.Item>
+                                 ))}
+                               </div>
+                             </Menu.Items>
+                           </Transition>
+                         </Menu>
+                       </div>
+                     </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleDownload}
+                        className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                         {toolText.download}
+                       </button>
+                       <Menu as="div" className="relative inline-block text-left">
+                        <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                           {downloadFormat === 'png' ? 'PNG' : downloadFormat === 'jpeg' ? 'JPG' : 'WebP'}
+                           <ChevronDownIcon className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                         </Menu.Button>
+                         <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
+                          <Menu.Items className="absolute right-0 z-[3000] mt-2 w-28 origin-top-right divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                             <div className="py-1">
+                               {['png', 'jpeg', 'webp'].map(fmt => (
+                                 <Menu.Item key={fmt}>
+                                   {({ active }) => (
+                                     <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`} onClick={() => setDownloadFormat(fmt as any)}>
+                                       {fmt === 'jpeg' ? 'JPG' : fmt.toUpperCase()}
+                                     </button>
+                                   )}
+                                 </Menu.Item>
+                               ))}
+                             </div>
+                           </Menu.Items>
+                         </Transition>
+                       </Menu>
+                       <button
+                         onClick={() => handleGenerate()}
+                         className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
+                       >
+                         <SparklesIcon className="w-4 h-4" />
+                         <span className="hidden sm:inline">Remove Shadow</span>
+                         <span className="sm:hidden">Run</span>
+                       </button>
+                     </div>
+                   </div>
+                   <div className="flex-1 relative flex overflow-hidden bg-slate-100" ref={wrapperRef}>
+                     {showReference && (
+                      <div className="hidden lg:flex lg:basis-[42%] lg:flex-none items-center justify-center bg-slate-200 border-r border-slate-300 relative overflow-hidden p-8">
+                         <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium z-10 shadow-sm border border-white/10">Original Reference</div>
+                         <img
+                           src={imageSrc!}
+                           alt="Reference"
+                           className="max-w-full max-h-full object-contain shadow-2xl rounded-lg ring-1 ring-black/10"
+                         />
+                       </div>
                      )}
-
-                     {/* Split View Area */}
-                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                        {/* Original Image (Reference) */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-semibold text-slate-900">Original (Reference)</h3>
-                              <div className="flex items-center">
-                                <button onClick={handleNewImage} className="inline-flex items-center rounded-full bg-cta-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cta-600 mr-6 md:mr-10 transition-colors">
-                                  Upload New
-                                </button>
-                              </div>
-                            </div>
-                            <div className="relative w-full overflow-hidden rounded-lg checkerboard border border-slate-300 shadow-sm group">
-                                <div className="relative w-full h-full">
-                                    <img ref={originalImageRef} src={imageSrc!} alt="Original" className="w-full h-auto cursor-default select-none pointer-events-none" onLoad={(e) => {
-                                        // Sync mask canvas size (handled in useEffect now, but kept for safety)
-                                        if (maskCanvasRef.current) {
-                                            maskCanvasRef.current.width = (e.target as HTMLImageElement).naturalWidth;
-                                            maskCanvasRef.current.height = (e.target as HTMLImageElement).naturalHeight;
-                                        }
-                                    }} />
-                                </div>
-                            </div>
+                    <div onWheel={handleWheelZoom} className={`flex-1 ${showReference ? 'lg:basis-[58%] lg:flex-none' : ''} relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
+                      <div
+                        className="relative inline-block shadow-2xl rounded-lg overflow-hidden ring-1 ring-slate-900/5 transition-transform duration-75 ease-linear origin-center will-change-transform"
+                        style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}
+                        onMouseDown={handlePanStart}
+                      >
+                         <img
+                           ref={originalImageRef}
+                           src={imageSrc!}
+                           alt="Original"
+                           className="hidden"
+                          onLoad={(e) => {
+                            drawImageToCanvases(e.target as HTMLImageElement);
+                          }}
+                         />
+                        <canvas ref={canvasRef} className="block w-auto h-auto max-w-full max-h-full" />
+                         <canvas
+                           ref={maskCanvasRef}
+                          className={`absolute inset-0 w-full h-full ${panMode ? 'pointer-events-none' : 'cursor-none'} opacity-80`}
+                           onMouseDown={handleDrawStart}
+                           onMouseMove={(e) => {
+                             if (isDrawing) return;
+                             if (cursorRef.current) {
+                               const rect = e.currentTarget.getBoundingClientRect();
+                               const x = e.clientX;
+                               const y = e.clientY;
+                               cursorRef.current.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+                              const visualSize = brushSize;
+                               cursorRef.current.style.width = `${visualSize}px`;
+                               cursorRef.current.style.height = `${visualSize}px`;
+                               if (!panMode) cursorRef.current.style.opacity = '1';
+                             }
+                           }}
+                           onMouseEnter={() => { if (cursorRef.current && !panMode) cursorRef.current.style.opacity = '1'; }}
+                           onMouseLeave={() => { if (cursorRef.current) cursorRef.current.style.opacity = '0'; }}
+                         />
+                       </div>
+                      {isProcessing && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/30 backdrop-blur-sm z-50">
+                          <div className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center gap-3">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                            <p className="text-sm font-medium text-slate-700">Removing shadow...</p>
+                          </div>
                         </div>
-
-                        {/* Processed Result (Interactive) */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-semibold text-slate-900">Processed Result (Paint here)</h3>
-                              <div className="flex items-center gap-2 mr-6 md:mr-10">
-                                <button onClick={handleDownload} className="rounded-full bg-cta-500 px-5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-cta-600 transition-colors">
-                                  {toolText.download}
-                                </button>
-                                <Menu as="div" className="relative inline-block text-left">
-                                  <div>
-                                    <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 border border-slate-300 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-50 transition-colors">
-                                      {downloadFormat === 'png' ? 'PNG' : downloadFormat === 'jpeg' ? 'JPG' : 'WebP'}
-                                      <ChevronDownIcon className="h-3 w-3 text-slate-500" aria-hidden="true" />
-                                    </Menu.Button>
-                                  </div>
-                                  <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
-                                    <Menu.Items className="absolute right-0 z-30 mt-2 w-28 origin-top-right divide-y divide-slate-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                      <div className="py-1">
-                                        {['png', 'jpeg', 'webp'].map(fmt => (
-                                          <Menu.Item key={fmt}>
-                                            {({ active }) => (
-                                              <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`} onClick={() => setDownloadFormat(fmt as any)}>
-                                                {fmt === 'jpeg' ? 'JPG' : fmt.toUpperCase()}
-                                              </button>
-                                            )}
-                                          </Menu.Item>
-                                        ))}
-                                      </div>
-                                    </Menu.Items>
-                                  </Transition>
-                                </Menu>
-                              </div>
-                            </div>
-                            <div className="relative w-full overflow-hidden rounded-lg checkerboard border border-slate-300 shadow-sm group" style={{ overscrollBehavior: 'contain' }}>
-                                <div ref={controlsBarRef} className="z-20 flex items-center gap-2 bg-white/80 backdrop-blur-md rounded-full px-2 py-1 border border-white/20 shadow-lg absolute top-2 left-2">
-                                  <button className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors" onClick={(e) => handleZoom(1.1, e)} title="Zoom In"><MagnifyingGlassPlusIcon className="w-4 h-4" /></button>
-                                  <button className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors" onClick={(e) => handleZoom(0.9, e)} title="Zoom Out"><MagnifyingGlassMinusIcon className="w-4 h-4" /></button>
-                                  <button className={`rounded-full p-2 transition-colors ${panMode ? 'bg-slate-200' : 'hover:bg-slate-100'} text-slate-900`} onClick={() => setPanMode(!panMode)} title="Pan Mode (Space)"><HandRaisedIcon className="w-4 h-4" /></button>
-                                  <span className="text-xs text-slate-600 w-12 text-center select-none">{Math.round(zoom*100)}%</span>
-                                  <button className="rounded-full p-2 text-slate-900 hover:bg-slate-100 transition-colors" onClick={resetView} title="Reset View"><ArrowPathIcon className="w-4 h-4" /></button>
-                                </div>
-                                
-                                <div className="relative w-full h-full origin-top-left transition-transform duration-75" style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}>
-                                    <canvas ref={canvasRef} className="w-full h-auto cursor-crosshair" onMouseDown={handlePanStart} />
-                                    <canvas 
-                                        ref={maskCanvasRef}
-                                        className={`absolute inset-0 w-full h-full ${panMode ? 'cursor-grab' : 'cursor-none'} opacity-80`}
-                                        onMouseDown={handleDrawStart}
-                                        onMouseMove={(e) => {
-                                            if (isDrawing) return; // Handled by window listener
-                                            // Update cursor position
-                                            if (cursorRef.current) {
-                                                cursorRef.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
-                                                
-                                                // Update cursor size
-                                            const rect = e.currentTarget.getBoundingClientRect();
-                                            // Scale calculation to match drawing logic
-                                            const maxDim = Math.max(e.currentTarget.width, e.currentTarget.height);
-                                            const adaptiveScale = Math.max(1, maxDim / 1000); 
-                                            const effectiveBrushSize = brushSize * adaptiveScale;
-                                            
-                                            // Convert canvas pixels to CSS pixels for cursor
-                                            const scaleX = rect.width / e.currentTarget.width;
-                                            const size = effectiveBrushSize * scaleX;
-                                            
-                                            cursorRef.current.style.width = `${size}px`;
-                                            cursorRef.current.style.height = `${size}px`;
-                                                
-                                                // Restore visibility if not in pan mode
-                                                if (!panMode) cursorRef.current.style.opacity = '1';
-                                            }
-                                        }}
-                                        onMouseEnter={() => {
-                                            if (cursorRef.current && !panMode) cursorRef.current.style.opacity = '1';
-                                        }}
-                                        onMouseLeave={() => {
-                                            if (cursorRef.current) cursorRef.current.style.opacity = '0';
-                                        }}
-                                    />
-                                </div>
-
-                                {isProcessing && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-50">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                      )}
                      </div>
-                  </div>
-                )}
+                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1040] flex items-center gap-2 bg-white/90 backdrop-blur-md rounded-full px-3 py-2 shadow-xl border border-white/50 ring-1 ring-black/5">
+                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(0.9, e)} title="Zoom Out"><MagnifyingGlassMinusIcon className="w-5 h-5" /></button>
+                       <span className="text-xs font-semibold text-slate-600 w-12 text-center select-none">{Math.round(zoom * 100)}%</span>
+                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(1.1, e)} title="Zoom In"><MagnifyingGlassPlusIcon className="w-5 h-5" /></button>
+                       <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                       <button className={`p-2 rounded-full transition-colors ${panMode ? 'bg-primary-100 text-primary-600' : 'hover:bg-slate-100 text-slate-600'}`} onClick={() => setPanMode(!panMode)} title="Pan Mode (Hold Space)">
+                         <HandRaisedIcon className="w-5 h-5" />
+                       </button>
+                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={resetView} title="Reset View"><ArrowPathIcon className="w-5 h-5" /></button>
+                     </div>
+                     <div className="absolute bottom-6 right-6 md:hidden z-[1040]">
+                       <button onClick={() => handleGenerate()} className="flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all active:scale-95">
+                         <SparklesIcon className="w-6 h-6" />
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+                </div>
+               )}
              </div>
            </div>
         </div>
 
+        {!imageSrc && (
+        <>
         {/* Content Section */}
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 space-y-16">
             {/* Sample Gallery */}
@@ -1380,6 +1432,8 @@ export default function RemoveShadowTool({
         </div>
 
         <Footer locale={locale} page={pageName} />
+        </>
+        )}
       </main>
     </>
   );
