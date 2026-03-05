@@ -44,7 +44,7 @@ export default function Footer({
           <div className="mt-16 grid grid-cols-2 gap-8 xl:col-span-2 xl:mt-0">
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
-                <h3 className="text-sm font-semibold leading-6 text-slate-900">{menuText.header0}</h3>
+                <div className="text-sm font-semibold leading-6 text-slate-900">{menuText.header0}</div>
                 <ul role="list" className="mt-6 space-y-4">
                   <li>
                     <Link href={getLinkHref(locale, 'remove-shadow')} onClick={() => checkPageAndLoading('remove-shadow')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
@@ -81,7 +81,7 @@ export default function Footer({
             </div>
             <div className="md:grid md:grid-cols-2 md:gap-8">
               <div>
-                <h3 className="text-sm font-semibold leading-6 text-slate-900">{menuText.footerSupport}</h3>
+                <div className="text-sm font-semibold leading-6 text-slate-900">{menuText.footerSupport}</div>
                 <ul role="list" className="mt-6 space-y-4">
                   <li>
                     <Link href={getLinkHref(locale, 'pricing')} onClick={() => checkPageAndLoading('pricing')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">

@@ -1375,13 +1375,6 @@ export default function RemoveShadowTool({
                                     <h3 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-primary-600 transition-colors">{sample.title}</h3>
                                     <p className="text-lg text-slate-600 leading-relaxed">{sample.desc}</p>
                                 </div>
-                                <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100/60 backdrop-blur-sm">
-                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-primary-500"></span>{pageText.sampleSettingsLabel || 'Settings used'}</div>
-                                    <div className="flex flex-wrap gap-3">
-                                        <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 shadow-sm">Strength: {sample.settings.strength}%</span>
-                                        <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-600 shadow-sm">Mode: {sample.settings.aggressive ? 'Aggressive' : 'Normal'}</span>
-                                    </div>
-                                </div>
                                 <button onClick={() => loadSample(sample)} className="group inline-flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-500 transition-colors">
                                     {pageText.trySampleBtn || 'Try this sample'} 
                                     <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -1400,33 +1393,69 @@ export default function RemoveShadowTool({
                 </div>
             </section>
 
-            {/* How It Works */}
-            <section ref={howToUseRef} className="scroll-mt-24">
-                <div className="relative overflow-hidden bg-slate-900 rounded-3xl px-6 py-16 sm:px-16 sm:py-24 lg:py-32 shadow-2xl isolate">
-                    <div className="absolute inset-0 -z-10 opacity-20" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-                    <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 blur-3xl opacity-30 w-96 h-96 bg-primary-500 rounded-full pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 translate-y-12 -translate-x-12 blur-3xl opacity-30 w-96 h-96 bg-purple-500 rounded-full pointer-events-none"></div>
-                    
-                    <div className="mx-auto max-w-2xl text-center">
-                        <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl mb-6">{pageText.howToUseTitle || 'How to Remove Shadows'}</h2>
-                        <p className="text-lg leading-8 text-slate-300 mb-12">{pageText.howToUseDesc || 'Follow these simple steps to clean up your images.'}</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-6xl mx-auto">
-                        {[
-                            { step: '01', title: pageText.step1Title, desc: pageText.step1Desc },
-                            { step: '02', title: pageText.step2Title, desc: pageText.step2Desc },
-                            { step: '03', title: pageText.step3Title, desc: pageText.step3Desc },
-                        ].map((item, i) => (
-                            <div key={i} className="relative pl-16 md:pl-0 md:pt-16 md:text-center group">
-                                <div className="absolute left-0 top-0 md:left-1/2 md:-translate-x-1/2 flex items-center justify-center w-12 h-12 rounded-xl bg-white/10 border border-white/20 text-xl font-bold text-white shadow-lg backdrop-blur-sm group-hover:bg-primary-500 group-hover:border-primary-400 transition-all duration-300">
-                                    {item.step}
-                                </div>
-                                <h3 className="text-xl font-semibold text-white mb-3">{item.title}</h3>
-                                <p className="text-slate-400 leading-relaxed">{item.desc}</p>
+            <section className="relative overflow-hidden rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
+                <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-6">{toolText.aboutTitle}</h2>
+                <div className="prose prose-lg prose-slate max-w-none">
+                    <p className="text-slate-600 leading-relaxed">{pageText.aboutDesc}</p>
+                    {pageText.featureTitle && (
+                        <>
+                            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">{pageText.featureTitle}</h3>
+                            <p className="text-slate-600">{pageText.featureDesc}</p>
+                        </>
+                    )}
+                    {pageText.useCasesTitle && (
+                        <>
+                            <h3 className="text-2xl font-bold text-slate-900 mt-8 mb-4">{pageText.useCasesTitle}</h3>
+                            <div className="text-slate-600 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: (pageText.useCasesDesc || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                        </>
+                    )}
+                </div>
+            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <section ref={howToUseRef} className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 h-full transition-all hover:shadow-2xl hover:bg-white/70 scroll-mt-24">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">{pageText.howTitle || pageText.howToUseTitle || toolText.stepTitle}</h2>
+                    <ul className="space-y-4">
+                        {[pageText.how1 || pageText.step1Desc, pageText.how2 || pageText.step2Desc, pageText.how3 || pageText.step3Desc, pageText.how4, pageText.how5, pageText.how6].filter(Boolean).map((step, i) => (
+                            <li key={i} className="flex gap-4">
+                                <span className="flex-none flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-600 font-bold text-sm shadow-sm">{i + 1}</span>
+                                <span className="text-slate-700 leading-relaxed pt-1">{step}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+
+                <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 h-full transition-all hover:shadow-2xl hover:bg-white/70">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">{pageText.formatsTitle || 'Supported Image Formats'}</h2>
+                    <div className="space-y-3">
+                        {[pageText.format1, pageText.format2, pageText.format3].filter(Boolean).map((fmt, idx) => (
+                            <div key={idx} className="flex items-center gap-3 rounded-xl bg-white/70 border border-slate-200 px-4 py-3">
+                                <span className="w-2 h-2 rounded-full bg-primary-500"></span>
+                                <span className="text-slate-700 font-medium">{fmt}</span>
                             </div>
                         ))}
                     </div>
+                </section>
+            </div>
+
+            <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-8">{toolText.faqTitle}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                    {[
+                        { q: pageText.faq1Q, a: pageText.faq1A },
+                        { q: pageText.faq2Q, a: pageText.faq2A },
+                        { q: pageText.faq3Q, a: pageText.faq3A },
+                        { q: pageText.faq4Q, a: pageText.faq4A },
+                        { q: pageText.faq5Q, a: pageText.faq5A },
+                        { q: pageText.faq6Q, a: pageText.faq6A },
+                        { q: pageText.faq7Q, a: pageText.faq7A }
+                    ].filter((item) => item.q).map((faq, idx) => (
+                        <div key={idx} className="bg-white/40 rounded-2xl p-6 shadow-sm border border-white/50 hover:bg-white/60 transition-colors">
+                            <h3 className="text-base font-semibold leading-7 text-slate-900 mb-2">{faq.q}</h3>
+                            <p className="text-sm leading-6 text-slate-600 whitespace-pre-line">{faq.a}</p>
+                        </div>
+                    ))}
                 </div>
             </section>
         </div>

@@ -13,10 +13,16 @@ export async function generateMetadata({ params: { locale } }) {
     description: pageText.description,
     keywords: [
       'remove shadow from photo',
+      'remove shadow from image online',
       'shadow remover',
+      'shadow reduction tool',
       'fix lighting in photos',
       'brighten dark photos',
       'remove shadow from face',
+      'reduce harsh shadows',
+      'improve photo lighting online',
+      'portrait shadow fix',
+      'product photo shadow removal',
       'png jpg webp export',
       'cleanup pictures'
     ],
@@ -45,26 +51,41 @@ export default async function RemoveShadowPage({ params: { locale } }) {
   const pageText = await languageModule.getRemoveShadowPageText();
   const toolText = await languageModule.getToolPageText();
 
-  const schema = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Remove Shadow from Photo",
-    "description": pageText.description,
-    "applicationCategory": "PhotographyApplication",
-    "operatingSystem": "Web",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
+  const schema = [
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Remove Shadow from Photo",
+      "description": pageText.description,
+      "applicationCategory": "PhotographyApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Reduce harsh shadows in portraits",
+        "Fix uneven lighting in product photos",
+        "Improve visibility in dark areas",
+        "Export as PNG, JPG, WebP",
+        "Local browser processing for privacy"
+      ]
     },
-    "featureList": [
-      "Remove harsh shadows from photos",
-      "Balance uneven lighting",
-      "Export as PNG, JPG, WebP",
-      "Adjust shadow reduction strength",
-      "Privacy-focused local processing"
-    ]
-  };
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": pageText.faq1Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq1A } },
+        { "@type": "Question", "name": pageText.faq2Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq2A } },
+        { "@type": "Question", "name": pageText.faq3Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq3A } },
+        { "@type": "Question", "name": pageText.faq4Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq4A } },
+        { "@type": "Question", "name": pageText.faq5Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq5A } },
+        { "@type": "Question", "name": pageText.faq6Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq6A } },
+        { "@type": "Question", "name": pageText.faq7Q, "acceptedAnswer": { "@type": "Answer", "text": pageText.faq7A } }
+      ].filter((item) => item.name && item.acceptedAnswer?.text)
+    }
+  ];
 
   return (
     <>

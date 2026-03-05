@@ -86,15 +86,23 @@ export const getToolPageText = async () => {
 
 export const getRemoveShadowPageText = async () => {
   const tPage = await getTranslations('RemoveShadowPage');
+  const tPageUnsafe = tPage as (key: string) => string;
   return {
     title: tPage('title'),
     h1: tPage('h1'),
     description: tPage('description'),
     aboutDesc: tPage('aboutDesc'),
+    featureTitle: tPageUnsafe('featureTitle'),
+    featureDesc: tPageUnsafe('featureDesc'),
+    useCasesTitle: tPageUnsafe('useCasesTitle'),
+    useCasesDesc: tPageUnsafe('useCasesDesc'),
     howTitle: tPage('howTitle'),
     how1: tPage('how1'),
     how2: tPage('how2'),
     how3: tPage('how3'),
+    how4: tPageUnsafe('how4'),
+    how5: tPageUnsafe('how5'),
+    how6: tPageUnsafe('how6'),
     whatTitle: tPage('whatTitle'),
     what1: tPage('what1'),
     what2: tPage('what2'),
