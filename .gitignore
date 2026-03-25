@@ -42,3 +42,5 @@ next-env.d.ts
 yarn.lock
 pnpm-lock.yaml
 package-lock.json
+升级方案.md
+升级方案2.md

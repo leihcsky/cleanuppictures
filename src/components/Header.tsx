@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { Dialog } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, SwatchIcon, SunIcon, FaceSmileIcon, HomeIcon, CurrencyDollarIcon, Squares2X2Icon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, SwatchIcon, SunIcon, HomeIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon } from '@heroicons/react/24/outline'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
@@ -117,6 +117,20 @@ export default function Header({
                   <Menu.Item>
                     {({ active }) => (
                       <Link
+                        href={getLinkHref(locale, 'remove-color')}
+                        onClick={() => checkPageAndLoading('remove-color')}
+                        className={`${
+                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
+                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
+                      >
+                        <SwatchIcon className="w-5 h-5" />
+                        {menuText.header3}
+                      </Link>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <Link
                         href={getLinkHref(locale, 'remove-shadow')}
                         onClick={() => checkPageAndLoading('remove-shadow')}
                         className={`${
@@ -129,30 +143,16 @@ export default function Header({
                     )}
                   </Menu.Item>
                   <Menu.Item>
-                    {({ active }) => (
-                      <Link
-                        href={getLinkHref(locale, 'remove-emoji')}
-                        onClick={() => checkPageAndLoading('remove-emoji')}
-                        className={`${
-                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
-                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
-                      >
-                        <FaceSmileIcon className="w-5 h-5" />
-                        {menuText.header2}
-                      </Link>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
                      {({ active }) => (
                        <Link
-                         href={getLinkHref(locale, 'remove-color')}
-                         onClick={() => checkPageAndLoading('remove-color')}
+                         href={getLinkHref(locale, 'remove-glare')}
+                         onClick={() => checkPageAndLoading('remove-glare')}
                          className={`${
                            active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
                          } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
                        >
-                         <SwatchIcon className="w-5 h-5" />
-                         {menuText.header3}
+                         <SparklesIcon className="w-5 h-5" />
+                         {menuText.header4}
                        </Link>
                      )}
                    </Menu.Item>
@@ -266,25 +266,25 @@ export default function Header({
                  </div>
 
                  <Link
-                   href={getLinkHref(locale, 'remove-shadow')}
-                   onClick={() => checkPageAndLoading('remove-shadow')}
+                  href={getLinkHref(locale, 'remove-color')}
+                  onClick={() => checkPageAndLoading('remove-color')}
                    className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                   <SunIcon className="w-5 h-5" />
-                   {menuText.header1}
+                  <SwatchIcon className="w-5 h-5" />
+                  {menuText.header3}
                  </Link>
                  <Link
-                   href={getLinkHref(locale, 'remove-emoji')}
-                   onClick={() => checkPageAndLoading('remove-emoji')}
+                  href={getLinkHref(locale, 'remove-shadow')}
+                  onClick={() => checkPageAndLoading('remove-shadow')}
                    className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                   <FaceSmileIcon className="w-5 h-5" />
-                   {menuText.header2}
+                  <SunIcon className="w-5 h-5" />
+                  {menuText.header1}
                  </Link>
                  <Link
-                   href={getLinkHref(locale, 'remove-color')}
-                   onClick={() => checkPageAndLoading('remove-color')}
+                  href={getLinkHref(locale, 'remove-glare')}
+                  onClick={() => checkPageAndLoading('remove-glare')}
                    className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                   <SwatchIcon className="w-5 h-5" />
-                   {menuText.header3}
+                  <SparklesIcon className="w-5 h-5" />
+                  {menuText.header4}
                  </Link>
 
                  <div className="border-t border-gray-100 my-2"></div>

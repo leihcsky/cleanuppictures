@@ -4,7 +4,7 @@ import Footer from "~/components/Footer";
 import { useCommonContext } from "~/context/common-context";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Script from "next/script";
-import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon, ArrowUpIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
 import { Menu, Transition } from "@headlessui/react";
@@ -16,7 +16,8 @@ export default function RemoveShadowTool({
   locale,
   pageName,
   pageText,
-  toolText
+  toolText,
+  apiPath = "remove-shadow"
 }) {
   const { setShowLoadingModal } = useCommonContext();
   
@@ -48,6 +49,7 @@ export default function RemoveShadowTool({
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
   const [showReference, setShowReference] = useState(true);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Debounce
   const [debouncedStrength, setDebouncedStrength] = useState(strength);
@@ -82,6 +84,13 @@ export default function RemoveShadowTool({
     }, 50);
     return () => window.clearTimeout(timer);
   }, [originalImage, imageSrc, drawImageToCanvases]);
+
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 700);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
 
 
@@ -118,44 +127,62 @@ export default function RemoveShadowTool({
     setTooltipState(prev => ({...prev, visible: false}));
   }, []);
 
+  const buildSampleProxyUrl = useCallback((remoteUrl: string) => {
+    return `/${locale}/api/image-proxy?url=${encodeURIComponent(remoteUrl)}`;
+  }, [locale]);
+
   // SAMPLES
   const SAMPLES = [
     {
       id: 'portrait',
       title: pageText.sample1Title || 'Portrait Face Shadow',
       desc: pageText.sample1Desc || 'Remove harsh shadows from faces caused by sunlight or hats.',
-      beforeUrl: '/images/samples/removeshadow/sample-portrait-before.jpg', 
-      afterUrl: '/images/samples/removeshadow/sample-portrait-after.jpg',
-      url: '/images/samples/removeshadow/sample-portrait-before.jpg',
-      settings: { strength: 85, aggressive: false }
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg'), 
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png'),
+      settings: { strength: 88, aggressive: false },
+      imagePosition: 'center 40%'
     },
     {
       id: 'product',
       title: pageText.sample2Title || 'Product Photography',
       desc: pageText.sample2Desc || 'Clean up distracting cast shadows to make products look professional.',
-      beforeUrl: '/images/samples/removeshadow/sample-product-before.jpg',
-      afterUrl: '/images/samples/removeshadow/sample-product-after.jpg',
-      url: '/images/samples/removeshadow/sample-product-before.jpg',
-      settings: { strength: 95, aggressive: true }
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg'),
+      settings: { strength: 92, aggressive: true },
+      imagePosition: 'center 55%'
     },
     {
-      id: 'document',
+      id: 'building',
       title: pageText.sample3Title || 'Document Scan',
       desc: pageText.sample3Desc || 'Remove phone shadows from photos of documents and paper.',
-      beforeUrl: '/images/samples/removeshadow/sample-document-before.jpg',
-      afterUrl: '/images/samples/removeshadow/sample-document-after.jpg',
-      url: '/images/samples/removeshadow/sample-document-before.jpg',
-      settings: { strength: 90, aggressive: true }
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg'),
+      settings: { strength: 86, aggressive: false },
+      imagePosition: 'center 58%'
+    },
+    {
+      id: 'general',
+      title: pageText.sample4Title || 'General Object Shadow',
+      desc: pageText.sample4Desc || 'Clean cast shadows around everyday objects for a clearer and more balanced photo.',
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg'),
+      settings: { strength: 88, aggressive: false },
+      imagePosition: 'center 52%'
     }
   ];
 
   const loadSample = (sample) => {
     setIsProcessing(true);
+    const sampleSource = sample.beforeUrl;
+    const sampleSourceWithTs = sampleSource + (sampleSource.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       setOriginalImage(img);
-      setImageSrc(sample.url);
+      setImageSrc(sampleSourceWithTs);
+      drawImageToCanvases(img);
+      setHistory([]);
+      setHistoryStep(-1);
       
       // Initialize Canvas with original image immediately to prevent layout shift
       // Handled by useEffect now
@@ -171,12 +198,13 @@ export default function RemoveShadowTool({
         if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
       }
       setMaskCanvasData(null);
+      setIsProcessing(false);
     };
     img.onerror = () => {
         setIsProcessing(false);
         alert("Failed to load sample image.");
     };
-    img.src = sample.url + (sample.url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+    img.src = sampleSourceWithTs;
   };
 
   useEffect(() => {
@@ -185,6 +213,9 @@ export default function RemoveShadowTool({
 
   const processFile = useCallback((file) => {
     if (!file.type.startsWith('image/')) return;
+    setHistory([]);
+    setHistoryStep(-1);
+    setMaskCanvasData(null);
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -200,8 +231,15 @@ export default function RemoveShadowTool({
     img.src = url;
   }, []);
 
+  const openFilePicker = useCallback(() => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.value = '';
+    fileInputRef.current.click();
+  }, []);
+
   const handleUpload = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) processFile(file);
   };
 
@@ -306,26 +344,37 @@ export default function RemoveShadowTool({
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = effectiveBrushSize;
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 1)';
     ctx.globalCompositeOperation = 'source-over'; // Additive
     
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x, y); // Start drawing a dot
     ctx.stroke();
+    if (cursorRef.current) {
+      cursorRef.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
+      if (!panMode) cursorRef.current.style.opacity = '1';
+    }
+
+    let lastX = x;
+    let lastY = y;
+    const minDist2 = 0.01;
 
     const onDrawMove = (ev) => {
-        // Use cached rect and scale values from closure to avoid getBoundingClientRect reflows
         const nx = (ev.clientX - rect.left) * scaleX;
         const ny = (ev.clientY - rect.top) * scaleY;
-        
+        const dx = nx - lastX;
+        const dy = ny - lastY;
+        if ((dx * dx + dy * dy) < minDist2) return;
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
         ctx.lineTo(nx, ny);
         ctx.stroke();
+        lastX = nx;
+        lastY = ny;
         
-        // Update cursor position during drawing
         if (cursorRef.current) {
              cursorRef.current.style.transform = `translate(${ev.clientX}px, ${ev.clientY}px) translate(-50%, -50%)`;
-             // Ensure it's visible
              if (!panMode) cursorRef.current.style.opacity = '1';
         }
     };
@@ -698,6 +747,7 @@ export default function RemoveShadowTool({
     // Get mask if exists
     let kieMaskDataUrl = null;
     let standardMaskDataUrl = null;
+    let dilatedMaskFlags: Uint8Array | null = null;
     let currentMaskData = maskCanvasData;
     
     if (!currentMaskData && maskCanvasRef.current) {
@@ -722,6 +772,42 @@ export default function RemoveShadowTool({
               const w = originalImage.naturalWidth;
               const h = originalImage.naturalHeight;
               
+              const dilationPadding = 14;
+              const srcData = currentMaskData.data;
+              const maskFlags = new Uint8Array(w * h);
+              for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
+                maskFlags[p] = srcData[i + 3] > 0 ? 1 : 0;
+              }
+              const binaryCanvas = document.createElement('canvas');
+              binaryCanvas.width = w;
+              binaryCanvas.height = h;
+              const binaryCtx = binaryCanvas.getContext('2d');
+              if (binaryCtx) {
+                const binaryData = binaryCtx.createImageData(w, h);
+                const binaryDst = binaryData.data;
+                for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
+                  const v = maskFlags[p] ? 255 : 0;
+                  binaryDst[i] = v;
+                  binaryDst[i + 1] = v;
+                  binaryDst[i + 2] = v;
+                  binaryDst[i + 3] = 255;
+                }
+                binaryCtx.putImageData(binaryData, 0, 0);
+                const blurCanvas = document.createElement('canvas');
+                blurCanvas.width = w;
+                blurCanvas.height = h;
+                const blurCtx = blurCanvas.getContext('2d');
+                if (blurCtx) {
+                  blurCtx.filter = `blur(${dilationPadding}px)`;
+                  blurCtx.drawImage(binaryCanvas, 0, 0);
+                  const blurData = blurCtx.getImageData(0, 0, w, h).data;
+                  for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
+                    maskFlags[p] = blurData[i] > 6 ? 1 : 0;
+                  }
+                }
+              }
+              dilatedMaskFlags = maskFlags;
+
               // 1. Create KIE Mask (White=Preserve, Black=Modify)
               const kieCanvas = document.createElement('canvas');
               kieCanvas.width = w;
@@ -742,17 +828,14 @@ export default function RemoveShadowTool({
                   stdCtx.fillStyle = 'black'; // Standard Preserve
                   stdCtx.fillRect(0, 0, w, h);
                   
-                  const srcData = currentMaskData.data;
-                  
                   // Create ImageData for pixel manipulation
                   const kieImgData = kieCtx.createImageData(w, h);
                   const stdImgData = stdCtx.createImageData(w, h);
                   const kieDst = kieImgData.data;
                   const stdDst = stdImgData.data;
                   
-                  for (let i = 0; i < srcData.length; i += 4) {
-                      const alpha = srcData[i + 3];
-                      if (alpha > 0) {
+                  for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
+                      if (maskFlags[p]) {
                           // Painted Area (Modify)
                           
                           // KIE: Black
@@ -792,24 +875,104 @@ export default function RemoveShadowTool({
          }
     }
 
+    const resizeDataUrl = (dataUrl: string, targetWidth: number, targetHeight: number, mime: string, quality?: number, smoothing = true) => {
+      return new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context unavailable'));
+            return;
+          }
+          ctx.imageSmoothingEnabled = smoothing;
+          ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+          resolve(canvas.toDataURL(mime, quality));
+        };
+        img.onerror = () => reject(new Error('Failed to resize image'));
+        img.src = dataUrl;
+      });
+    };
+
+    const createLamaResizedPayload = async (payload: any, maxSide: number) => {
+      if (!canvasRef.current) return { ...payload, resizedForLama: true };
+      const baseWidth = canvasRef.current.width;
+      const baseHeight = canvasRef.current.height;
+      const longest = Math.max(baseWidth, baseHeight);
+      if (!Number.isFinite(maxSide) || maxSide <= 0 || longest <= maxSide) {
+        return { ...payload, resizedForLama: true };
+      }
+      const ratio = maxSide / longest;
+      const targetWidth = Math.max(1, Math.round(baseWidth * ratio));
+      const targetHeight = Math.max(1, Math.round(baseHeight * ratio));
+      const resizedImage = await resizeDataUrl(payload.imageDataUrl, targetWidth, targetHeight, 'image/jpeg', 0.92, true);
+      const resizedMask = payload.maskDataUrl
+        ? await resizeDataUrl(payload.maskDataUrl, targetWidth, targetHeight, 'image/png', undefined, false)
+        : null;
+      const resizedKieMask = payload.kieMaskDataUrl
+        ? await resizeDataUrl(payload.kieMaskDataUrl, targetWidth, targetHeight, 'image/png', undefined, false)
+        : null;
+      return {
+        ...payload,
+        imageDataUrl: resizedImage,
+        maskDataUrl: resizedMask,
+        kieMaskDataUrl: resizedKieMask,
+        resizedForLama: true
+      };
+    };
+
+    const requestRemoveShadow = async (payload: any) => {
+      const response = await fetch(`/${locale}/api/${apiPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json();
+      return { response, json };
+    };
+
     try {
       setIsProcessing(true);
       
       // Use the current canvas content as source (allows iterative editing)
-      const src = canvasRef.current.toDataURL('image/jpeg', 0.95);
-
-      const res = await fetch(`/${locale}/api/remove-shadow`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageDataUrl: src,
-          maskDataUrl: standardMaskDataUrl, // Send standard mask as default
-          kieMaskDataUrl,                   // Send KIE mask specifically
-          scene: sceneType
-        })
-      });
-      
-      const json = await res.json();
+      let src = canvasRef.current.toDataURL('image/png');
+      if (dilatedMaskFlags && canvasRef.current) {
+        const w = canvasRef.current.width;
+        const h = canvasRef.current.height;
+        const prefillCanvas = document.createElement('canvas');
+        prefillCanvas.width = w;
+        prefillCanvas.height = h;
+        const prefillCtx = prefillCanvas.getContext('2d');
+        if (prefillCtx) {
+          prefillCtx.drawImage(canvasRef.current, 0, 0, w, h);
+          const imgData = prefillCtx.getImageData(0, 0, w, h);
+          const data = imgData.data;
+          for (let p = 0, i = 0; p < dilatedMaskFlags.length; p++, i += 4) {
+            if (!dilatedMaskFlags[p]) continue;
+            data[i] = Math.min(255, Math.round(data[i] * 1.2));
+            data[i + 1] = Math.min(255, Math.round(data[i + 1] * 1.2));
+            data[i + 2] = Math.min(255, Math.round(data[i + 2] * 1.2));
+          }
+          prefillCtx.putImageData(imgData, 0, 0);
+          src = prefillCanvas.toDataURL('image/png');
+        }
+      }
+      let payload = {
+        imageDataUrl: src,
+        maskDataUrl: standardMaskDataUrl,
+        kieMaskDataUrl,
+        scene: sceneType
+      };
+      let { response: res, json } = await requestRemoveShadow(payload);
+      if (res.ok && json?.need_client_resize) {
+        const maxSide = Number(json.maxSide || 1600);
+        payload = await createLamaResizedPayload(payload, maxSide);
+        const retry = await requestRemoveShadow(payload);
+        res = retry.response;
+        json = retry.json;
+      }
       if (res.ok && json.output_url) {
         // Load result into canvas
         const img = new Image();
@@ -916,21 +1079,37 @@ export default function RemoveShadowTool({
                              }
                          }
                          
-                         if (pixelCount > 0) {
+                        if (pixelCount > 0) {
                              diffR /= pixelCount;
                              diffG /= pixelCount;
                              diffB /= pixelCount;
                          }
 
                          for (let i = 0; i < baseData.length; i += 4) {
-                             // Get Alpha from the feathered mask
-                             let alpha = maskData[i + 3] / 255.0;
+                            const coreAlpha = currentMaskData.data[i + 3] > 0 ? 1 : 0;
+                            const featherAlpha = maskData[i + 3] / 255.0;
+                            const edgeAlpha = Math.max(0, featherAlpha - coreAlpha) * 0.25;
+                            const alpha = Math.min(1, coreAlpha + edgeAlpha);
                              
                              // Apply Color Correction to AI pixel
                              // AI_Corrected = AI + Diff (where Diff = Base - AI) -> AI_Corrected approaches Base
-                             const aiR = Math.min(255, Math.max(0, aiData[i] + diffR));
-                             const aiG = Math.min(255, Math.max(0, aiData[i + 1] + diffG));
-                             const aiB = Math.min(255, Math.max(0, aiData[i + 2] + diffB));
+                            const correctionFactor = coreAlpha > 0 ? 0.22 : 1;
+                            const diffCoreR = coreAlpha > 0 ? Math.max(0, diffR) : diffR;
+                            const diffCoreG = coreAlpha > 0 ? Math.max(0, diffG) : diffG;
+                            const diffCoreB = coreAlpha > 0 ? Math.max(0, diffB) : diffB;
+                            let aiR = Math.min(255, Math.max(0, aiData[i] + diffCoreR * correctionFactor));
+                            let aiG = Math.min(255, Math.max(0, aiData[i + 1] + diffCoreG * correctionFactor));
+                            let aiB = Math.min(255, Math.max(0, aiData[i + 2] + diffCoreB * correctionFactor));
+                            if (coreAlpha > 0) {
+                              const baseLum = 0.2126 * baseData[i] + 0.7152 * baseData[i + 1] + 0.0722 * baseData[i + 2];
+                              const aiLum = 0.2126 * aiR + 0.7152 * aiG + 0.0722 * aiB;
+                              if (aiLum < baseLum) {
+                                const lift = baseLum / Math.max(1e-6, aiLum);
+                                aiR = Math.min(255, aiR * lift);
+                                aiG = Math.min(255, aiG * lift);
+                                aiB = Math.min(255, aiB * lift);
+                              }
+                            }
                              
                              outData[i] = baseData[i] * (1 - alpha) + aiR * alpha;
                              outData[i + 1] = baseData[i + 1] * (1 - alpha) + aiG * alpha;
@@ -952,7 +1131,7 @@ export default function RemoveShadowTool({
                 }
                 
                 // Clear mask after successful refine
-                handleClearMask();
+                clearMask(false);
             }
             setIsProcessing(false);
           }
@@ -1005,23 +1184,28 @@ export default function RemoveShadowTool({
     }
   };
   
-  const handleClearMask = () => {
+  const clearMask = (addToHistory = true) => {
     if (maskCanvasRef.current) {
         const ctx = maskCanvasRef.current.getContext('2d');
         if (ctx) {
             ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
-            const emptyData = ctx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
-            setMaskCanvasData(emptyData);
-            
-            // Add to history
-            const newHistory = history.slice(0, historyStep + 1);
-            newHistory.push(emptyData);
-            if (newHistory.length > 20) newHistory.shift();
-            setHistory(newHistory);
-            setHistoryStep(newHistory.length - 1);
+            if (addToHistory) {
+                const emptyData = ctx.getImageData(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+                setMaskCanvasData(emptyData);
+                const newHistory = history.slice(0, historyStep + 1);
+                newHistory.push(emptyData);
+                if (newHistory.length > 20) newHistory.shift();
+                setHistory(newHistory);
+                setHistoryStep(newHistory.length - 1);
+            } else {
+                setMaskCanvasData(null);
+                setHistory([]);
+                setHistoryStep(-1);
+            }
         }
     }
   };
+  const handleClearMask = () => clearMask(true);
   
   // Undo/Redo Handlers
   const handleUndo = () => {
@@ -1067,13 +1251,13 @@ export default function RemoveShadowTool({
       {/* Custom Cursor */}
       <div 
         ref={cursorRef}
-        className="fixed pointer-events-none rounded-full border-2 border-sky-400 z-[100] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-150 opacity-0"
-        style={{ width: 20, height: 20, left: 0, top: 0 }}
+        className="fixed pointer-events-none rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(15,23,42,0.95)] z-[10000] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-75 opacity-0"
+        style={{ width: Math.max(12, brushSize), height: Math.max(12, brushSize), left: 0, top: 0, mixBlendMode: 'difference', backgroundColor: 'rgba(255,255,255,0.2)' }}
       />
       <input id="file-upload" name="file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleUpload} accept="image/png, image/jpeg, image/webp" />
       {!imageSrc && <Header locale={locale} page={pageName} />}
       <main className="isolate bg-slate-50">
-        <Script id="remove-shadow-ld" type="application/ld+json">
+        <Script id={`${pageName}-ld`} type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebPage",
@@ -1129,7 +1313,7 @@ export default function RemoveShadowTool({
                    <div className="w-full max-w-xl mx-auto">
                      <div
                        className="relative flex flex-col items-center justify-center gap-6 p-10 rounded-3xl border-2 border-dashed border-slate-300 bg-white/40 backdrop-blur-md hover:border-primary-400 hover:bg-white/60 hover:shadow-xl hover:scale-[1.01] transition-all duration-300 cursor-pointer group"
-                       onClick={() => fileInputRef.current?.click()}
+                      onClick={openFilePicker}
                      >
                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none rounded-3xl" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
                        <div className="relative z-10 flex flex-col items-center gap-5">
@@ -1140,7 +1324,7 @@ export default function RemoveShadowTool({
                          </div>
                          <div className="text-center space-y-2">
                            <h2 className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
-                           <p className="text-sm text-slate-600 max-w-xs mx-auto leading-relaxed">{toolText.uploadDesc}</p>
+                          <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">{toolText.uploadDesc}</p>
                            <p className="text-xs text-slate-400">{toolText.uploadSubDesc}</p>
                          </div>
                        </div>
@@ -1165,7 +1349,7 @@ export default function RemoveShadowTool({
                         <span>Exit Editor</span>
                        </button>
                        <button
-                         onClick={() => fileInputRef.current?.click()}
+                        onClick={openFilePicker}
                          className="inline-flex items-center text-slate-700 hover:text-slate-900 font-medium px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
                        >
                          Upload New
@@ -1213,7 +1397,7 @@ export default function RemoveShadowTool({
                        <button onClick={handleClearMask} className="text-xs text-red-600 hover:text-red-700 font-medium px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-md transition-colors whitespace-nowrap">
                          Clear
                        </button>
-                      <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
+                     <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
                          <Menu as="div" className="relative inline-block text-left">
                            <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
                              {sceneType === 'general' ? 'General' :
@@ -1243,6 +1427,14 @@ export default function RemoveShadowTool({
                      </div>
                     <div className="flex items-center gap-3">
                       <button
+                        onClick={() => handleGenerate()}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
+                      >
+                        <SparklesIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">{pageText.actionButton || 'Remove Shadow'}</span>
+                        <span className="sm:hidden">Run</span>
+                      </button>
+                      <button
                         onClick={handleDownload}
                         className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                       >
@@ -1269,14 +1461,6 @@ export default function RemoveShadowTool({
                            </Menu.Items>
                          </Transition>
                        </Menu>
-                       <button
-                         onClick={() => handleGenerate()}
-                         className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
-                       >
-                         <SparklesIcon className="w-4 h-4" />
-                         <span className="hidden sm:inline">Remove Shadow</span>
-                         <span className="sm:hidden">Run</span>
-                       </button>
                      </div>
                    </div>
                    <div className="flex-1 relative flex overflow-hidden bg-slate-100" ref={wrapperRef}>
@@ -1308,7 +1492,7 @@ export default function RemoveShadowTool({
                         <canvas ref={canvasRef} className="block w-auto h-auto max-w-full max-h-full" />
                          <canvas
                            ref={maskCanvasRef}
-                          className={`absolute inset-0 w-full h-full ${panMode ? 'pointer-events-none' : 'cursor-none'} opacity-80`}
+                          className={`absolute inset-0 w-full h-full ${panMode ? 'pointer-events-none' : 'cursor-none'} opacity-100`}
                            onMouseDown={handleDrawStart}
                            onMouseMove={(e) => {
                              if (isDrawing) return;
@@ -1331,7 +1515,7 @@ export default function RemoveShadowTool({
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/30 backdrop-blur-sm z-50">
                           <div className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                            <p className="text-sm font-medium text-slate-700">Removing shadow...</p>
+                            <p className="text-sm font-medium text-slate-700">{pageText.processingLabel || 'Removing shadow...'}</p>
                           </div>
                         </div>
                       )}
@@ -1362,33 +1546,44 @@ export default function RemoveShadowTool({
         {!imageSrc && (
         <>
         {/* Content Section */}
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 space-y-16">
+        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 space-y-20">
             {/* Sample Gallery */}
-            <section ref={samplesRef} className="text-center scroll-mt-24">
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-4">{pageText.sampleTitle || 'Try with Samples'}</h2>
-                <p className="text-lg text-slate-600 mb-16 max-w-2xl mx-auto">{pageText.sampleDesc || 'Click any sample below to load it into the editor.'}</p>
+            <section ref={samplesRef} className="scroll-mt-24">
+                <div className="text-center mb-16">
+                    <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-4 py-1.5 text-xs font-semibold tracking-wide text-primary-700 mb-4">BEFORE & AFTER</span>
+                    <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mb-4">{pageText.sampleTitle || 'Try with Samples'}</h2>
+                    <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed">{pageText.sampleDesc || 'Click any sample below to load it into the editor.'}</p>
+                </div>
                 <div className="space-y-24">
                     {SAMPLES.map((sample, index) => (
-                        <div key={sample.id} className={`flex flex-col lg:flex-row items-center gap-12 lg:gap-20 ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
-                            <div className="flex-1 text-left space-y-8">
-                                <div>
-                                    <h3 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-primary-600 transition-colors">{sample.title}</h3>
-                                    <p className="text-lg text-slate-600 leading-relaxed">{sample.desc}</p>
+                        <article key={sample.id} className={`group relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-sm p-6 lg:p-8 ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 pointer-events-none"></div>
+                            <div className={`relative z-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-14 ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
+                                <div className="flex-1 text-left space-y-7">
+                                    <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">{sample.id}</div>
+                                    <div>
+                                        <h3 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-3 transition-colors group-hover:text-primary-700">{sample.title}</h3>
+                                        <p className="text-base lg:text-lg text-slate-600 leading-relaxed">{sample.desc}</p>
+                                    </div>
+                                    <button onClick={() => loadSample(sample)} className="group/btn inline-flex items-center gap-2 rounded-full bg-slate-900 hover:bg-primary-600 text-white font-semibold px-6 py-3 shadow-lg shadow-slate-900/20 hover:shadow-primary-500/30 transition-all duration-300">
+                                        {pageText.trySampleBtn || 'Try this sample'}
+                                        <ArrowRightIcon className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                                    </button>
                                 </div>
-                                <button onClick={() => loadSample(sample)} className="group inline-flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-500 transition-colors">
-                                    {pageText.trySampleBtn || 'Try this sample'} 
-                                    <ArrowRightIcon className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                </button>
+                                <div className="flex-1 w-full max-w-xl lg:max-w-2xl relative cursor-pointer" onClick={() => loadSample(sample)}>
+                                    <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary-200/40 to-indigo-200/40 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                    <div className="relative rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-300/40">
+                                        <ComparisonSlider 
+                                            beforeUrl={sample.beforeUrl}
+                                            afterUrl={sample.afterUrl}
+                                            imageFit="cover"
+                                            imagePosition={sample.imagePosition || 'center center'}
+                                            className="aspect-[16/10] rounded-xl overflow-hidden"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex-1 relative group cursor-pointer" onClick={() => loadSample(sample)}>
-                                <div className="absolute -inset-4 bg-gradient-to-r from-primary-100 to-purple-100 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl -z-10"></div>
-                                <ComparisonSlider 
-                                    beforeUrl={sample.beforeUrl}
-                                    afterUrl={sample.afterUrl}
-                                    className="aspect-[3/2] rounded-2xl shadow-2xl border-4 border-white transform transition-transform duration-500 group-hover:scale-[1.02]"
-                                />
-                            </div>
-                        </div>
+                        </article>
                     ))}
                 </div>
             </section>
@@ -1439,9 +1634,12 @@ export default function RemoveShadowTool({
                 </section>
             </div>
 
-            <section className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-8">{toolText.faqTitle}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+            <section className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl px-8 py-10 lg:px-12 lg:py-14">
+                <div className="absolute -top-24 -right-16 w-72 h-72 rounded-full bg-primary-500/20 blur-3xl pointer-events-none"></div>
+                <div className="absolute -bottom-20 -left-16 w-72 h-72 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"></div>
+                <h2 className="relative text-3xl font-bold tracking-tight text-white mb-3">{toolText.faqTitle}</h2>
+                <p className="relative text-slate-300 mb-10 max-w-3xl">Everything you need to know before editing your first shadow-heavy photo.</p>
+                <div className="relative grid grid-cols-1 md:grid-cols-2 gap-5">
                     {[
                         { q: pageText.faq1Q, a: pageText.faq1A },
                         { q: pageText.faq2Q, a: pageText.faq2A },
@@ -1451,9 +1649,12 @@ export default function RemoveShadowTool({
                         { q: pageText.faq6Q, a: pageText.faq6A },
                         { q: pageText.faq7Q, a: pageText.faq7A }
                     ].filter((item) => item.q).map((faq, idx) => (
-                        <div key={idx} className="bg-white/40 rounded-2xl p-6 shadow-sm border border-white/50 hover:bg-white/60 transition-colors">
-                            <h3 className="text-base font-semibold leading-7 text-slate-900 mb-2">{faq.q}</h3>
-                            <p className="text-sm leading-6 text-slate-600 whitespace-pre-line">{faq.a}</p>
+                        <div key={idx} className="rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] p-6 transition-colors">
+                            <div className="flex items-start gap-3">
+                                <span className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary-500/20 text-primary-300 text-xs font-bold">{idx + 1}</span>
+                                <h3 className="text-base font-semibold leading-7 text-white">{faq.q}</h3>
+                            </div>
+                            <p className="mt-3 pl-9 text-sm leading-6 text-slate-300 whitespace-pre-line">{faq.a}</p>
                         </div>
                     ))}
                 </div>
@@ -1462,6 +1663,15 @@ export default function RemoveShadowTool({
 
         <Footer locale={locale} page={pageName} />
         </>
+        )}
+        {showBackToTop && (
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 right-6 z-[1200] inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-900/90 hover:bg-primary-600 text-white shadow-lg shadow-slate-900/30 transition-colors backdrop-blur-sm"
+            title="Back to top"
+          >
+            <ArrowUpIcon className="w-5 h-5" />
+          </button>
         )}
       </main>
     </>

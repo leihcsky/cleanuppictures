@@ -47,18 +47,18 @@ export default function Footer({
                 <div className="text-sm font-semibold leading-6 text-slate-900">{menuText.header0}</div>
                 <ul role="list" className="mt-6 space-y-4">
                   <li>
+                    <Link href={getLinkHref(locale, 'remove-color')} onClick={() => checkPageAndLoading('remove-color')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
+                      {menuText.header3}
+                    </Link>
+                  </li>
+                  <li>
                     <Link href={getLinkHref(locale, 'remove-shadow')} onClick={() => checkPageAndLoading('remove-shadow')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
                       {menuText.header1}
                     </Link>
                   </li>
                   <li>
-                    <Link href={getLinkHref(locale, 'remove-emoji')} onClick={() => checkPageAndLoading('remove-emoji')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
-                      {menuText.header2}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link href={getLinkHref(locale, 'remove-color')} onClick={() => checkPageAndLoading('remove-color')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
-                      {menuText.header3}
+                    <Link href={getLinkHref(locale, 'remove-glare')} onClick={() => checkPageAndLoading('remove-glare')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
+                      {menuText.header4}
                     </Link>
                   </li>
                 </ul>
