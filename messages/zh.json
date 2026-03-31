@@ -93,7 +93,7 @@
     "searchButtonText": "搜索"
   },
   "MenuText": {
-    "header0": "CleanupPictures",
+    "header0": "PicCleaner",
     "header1": "去除阴影",
     "header2": "去除表情包",
     "header3": "去除颜色",

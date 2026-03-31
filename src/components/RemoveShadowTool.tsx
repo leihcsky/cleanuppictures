@@ -4,11 +4,13 @@ import Footer from "~/components/Footer";
 import { useCommonContext } from "~/context/common-context";
 import { useEffect, useRef, useState, useCallback } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon, ArrowUpIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
 import { Menu, Transition } from "@headlessui/react";
 import ComparisonSlider from "./ComparisonSlider";
+import { getLinkHref } from "~/configs/buildLink";
 
 const clamp = (v:number, min:number, max:number) => Math.min(max, Math.max(min, v));
 
@@ -17,9 +19,17 @@ export default function RemoveShadowTool({
   pageName,
   pageText,
   toolText,
-  apiPath = "remove-shadow"
+  apiPath = "remove-shadow",
+  initialMode = "object"
 }) {
   const { setShowLoadingModal } = useCommonContext();
+  const isHomeTool = !pageName;
+  const normalizeMode = (value: string | null | undefined) => {
+    const v = String(value || '').toLowerCase();
+    if (v === 'shadow' || v === 'glare' || v === 'person' || v === 'text' || v === 'object') return v as 'shadow' | 'glare' | 'person' | 'text' | 'object';
+    return 'object';
+  };
+  const defaultModeFromPage = pageName === 'remove-shadow' ? 'shadow' : pageName === 'remove-glare' ? 'glare' : initialMode;
   
   // State
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -28,6 +38,7 @@ export default function RemoveShadowTool({
   const [downloadFormat, setDownloadFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [sceneType, setSceneType] = useState<'general' | 'person' | 'building' | 'portrait' | 'object'>('general');
+  const [editorMode, setEditorMode] = useState<'shadow' | 'glare' | 'person' | 'text' | 'object'>(normalizeMode(defaultModeFromPage));
   const [aggressive, setAggressive] = useState<boolean>(true);
   const [bias, setBias] = useState<number>(60);
   const [extreme, setExtreme] = useState<boolean>(true);
@@ -53,6 +64,39 @@ export default function RemoveShadowTool({
 
   // Debounce
   const [debouncedStrength, setDebouncedStrength] = useState(strength);
+  useEffect(() => {
+    const mode = normalizeMode(defaultModeFromPage);
+    setEditorMode(mode);
+  }, [defaultModeFromPage]);
+  useEffect(() => {
+    if (editorMode === 'shadow') {
+      setAggressive(true);
+      setExtreme(true);
+      setBias(60);
+      setTargetBright(92);
+      setSceneType((prev) => prev === 'general' ? 'building' : prev);
+      return;
+    }
+    if (editorMode === 'glare') {
+      setAggressive(true);
+      setExtreme(false);
+      setBias(52);
+      setTargetBright(88);
+      setSceneType('general');
+      return;
+    }
+    setAggressive(false);
+    setExtreme(false);
+    setBias(45);
+    setTargetBright(82);
+    if (editorMode === 'person') {
+      setSceneType('person');
+    } else if (editorMode === 'text') {
+      setSceneType('object');
+    } else {
+      setSceneType('general');
+    }
+  }, [editorMode]);
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedStrength(strength), 100);
     return () => clearTimeout(handler);
@@ -170,9 +214,17 @@ export default function RemoveShadowTool({
       imagePosition: 'center 52%'
     }
   ];
+  const HOME_USE_CASES = [
+    { key: 'photographers', label: 'Content Creators', sampleId: 'portrait' },
+    { key: 'agencies', label: 'Marketing Teams', sampleId: 'general' },
+    { key: 'realestate', label: 'Real Estate Teams', sampleId: 'building' },
+    { key: 'ecommerce', label: 'Ecommerce Sellers', sampleId: 'product' }
+  ];
+  const [activeHomeUseCase, setActiveHomeUseCase] = useState(HOME_USE_CASES[0].key);
 
   const loadSample = (sample) => {
     setIsProcessing(true);
+    setShowReference(false);
     const sampleSource = sample.beforeUrl;
     const sampleSourceWithTs = sampleSource + (sampleSource.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
     const img = new Image();
@@ -190,7 +242,9 @@ export default function RemoveShadowTool({
 
       if (sample.settings) {
         setStrength(sample.settings.strength ?? 90);
-        setAggressive(sample.settings.aggressive ?? true);
+        if (editorMode === 'shadow' || editorMode === 'glare') {
+          setAggressive(sample.settings.aggressive ?? true);
+        }
       }
       // Reset mask
       if (maskCanvasRef.current) {
@@ -213,6 +267,8 @@ export default function RemoveShadowTool({
 
   const processFile = useCallback((file) => {
     if (!file.type.startsWith('image/')) return;
+    sessionStorage.removeItem('cleanup_pending_upload');
+    setShowReference(false);
     setHistory([]);
     setHistoryStep(-1);
     setMaskCanvasData(null);
@@ -230,6 +286,43 @@ export default function RemoveShadowTool({
     };
     img.src = url;
   }, []);
+  const loadImageFromSource = useCallback((source: string) => {
+    setHistory([]);
+    setHistoryStep(-1);
+    setMaskCanvasData(null);
+    setShowReference(false);
+    const img = new Image();
+    if (/^https?:\/\//i.test(source)) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => {
+      setOriginalImage(img);
+      setImageSrc(source);
+      setStrength(90);
+      if (maskCanvasRef.current) {
+        const ctx = maskCanvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+      }
+      setMaskCanvasData(null);
+    };
+    img.src = source;
+  }, []);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('cleanup_pending_upload');
+      if (!raw) return;
+      const payload = JSON.parse(raw);
+      if (payload?.type === 'data' && typeof payload.value === 'string') {
+        loadImageFromSource(payload.value);
+      } else if (payload?.type === 'url' && typeof payload.value === 'string') {
+        loadImageFromSource(payload.value);
+      } else {
+        sessionStorage.removeItem('cleanup_pending_upload');
+      }
+    } catch {
+      sessionStorage.removeItem('cleanup_pending_upload');
+    }
+  }, [loadImageFromSource]);
 
   const openFilePicker = useCallback(() => {
     if (!fileInputRef.current) return;
@@ -698,7 +791,7 @@ export default function RemoveShadowTool({
     }
     ctx.putImageData(imgData, 0, 0);
     setIsProcessing(false);
-  }, [originalImage, debouncedStrength, aggressive, bias, extreme, targetBright, maskCanvasData]);
+  }, [originalImage, debouncedStrength, aggressive, bias, extreme, targetBright, maskCanvasData, editorMode]);
 
   // Remove auto-processing useEffect
   // useEffect(() => {
@@ -772,7 +865,7 @@ export default function RemoveShadowTool({
               const w = originalImage.naturalWidth;
               const h = originalImage.naturalHeight;
               
-              const dilationPadding = 14;
+              const dilationPadding = editorMode === 'shadow' ? 16 : editorMode === 'glare' ? 10 : 4;
               const srcData = currentMaskData.data;
               const maskFlags = new Uint8Array(w * h);
               for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
@@ -938,9 +1031,10 @@ export default function RemoveShadowTool({
       
       // Use the current canvas content as source (allows iterative editing)
       let src = canvasRef.current.toDataURL('image/png');
-      if (dilatedMaskFlags && canvasRef.current) {
+      if (dilatedMaskFlags && canvasRef.current && (editorMode === 'shadow' || editorMode === 'glare')) {
         const w = canvasRef.current.width;
         const h = canvasRef.current.height;
+        const boost = editorMode === 'shadow' ? 1.2 : 1.12;
         const prefillCanvas = document.createElement('canvas');
         prefillCanvas.width = w;
         prefillCanvas.height = h;
@@ -951,9 +1045,9 @@ export default function RemoveShadowTool({
           const data = imgData.data;
           for (let p = 0, i = 0; p < dilatedMaskFlags.length; p++, i += 4) {
             if (!dilatedMaskFlags[p]) continue;
-            data[i] = Math.min(255, Math.round(data[i] * 1.2));
-            data[i + 1] = Math.min(255, Math.round(data[i + 1] * 1.2));
-            data[i + 2] = Math.min(255, Math.round(data[i + 2] * 1.2));
+            data[i] = Math.min(255, Math.round(data[i] * boost));
+            data[i + 1] = Math.min(255, Math.round(data[i + 1] * boost));
+            data[i + 2] = Math.min(255, Math.round(data[i + 2] * boost));
           }
           prefillCtx.putImageData(imgData, 0, 0);
           src = prefillCanvas.toDataURL('image/png');
@@ -963,7 +1057,8 @@ export default function RemoveShadowTool({
         imageDataUrl: src,
         maskDataUrl: standardMaskDataUrl,
         kieMaskDataUrl,
-        scene: sceneType
+        scene: sceneType,
+        mode: editorMode
       };
       let { response: res, json } = await requestRemoveShadow(payload);
       if (res.ok && json?.need_client_resize) {
@@ -1154,28 +1249,44 @@ export default function RemoveShadowTool({
   };
 
   useEffect(() => {
-    if (originalImage && wrapperRef.current) {
+    if (!originalImage || !wrapperRef.current) return;
+    const fitToViewport = () => {
+      if (!wrapperRef.current) return false;
       const { naturalWidth: w, naturalHeight: h } = originalImage;
       const wrapper = wrapperRef.current;
-      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
-      const effectiveShowReference = showReference && isDesktop;
-      const availableWidth = effectiveShowReference ? wrapper.clientWidth * 0.58 : wrapper.clientWidth;
-      const availableHeight = wrapper.clientHeight;
-      const scaleX = (availableWidth - 24) / w;
-      const scaleY = (availableHeight - 24) / h;
+      const availableWidth = Math.max(0, wrapper.clientWidth - 24);
+      const availableHeight = Math.max(0, wrapper.clientHeight - 24);
+      if (!availableWidth || !availableHeight || !w || !h) return false;
+      const scaleX = availableWidth / w;
+      const scaleY = availableHeight / h;
       const fitScale = Math.min(scaleX, scaleY, 1);
-      const initialZoom = Math.max(1, fitScale);
+      const minComfortZoom = typeof window !== 'undefined' && window.innerWidth >= 1024 ? 0.34 : 0.24;
+      const initialZoom = Math.min(1, Math.max(minComfortZoom, fitScale));
       setZoom(initialZoom);
       setPanX(0);
       setPanY(0);
-    }
+      return true;
+    };
+    if (fitToViewport()) return;
+    const timer = window.setTimeout(() => {
+      fitToViewport();
+    }, 60);
+    return () => window.clearTimeout(timer);
   }, [originalImage, showReference]);
 
   const handleNewImage = () => {
+    sessionStorage.removeItem('cleanup_pending_upload');
+    if (isHomeTool) {
+      setEditorMode('object');
+      if (typeof window !== 'undefined') {
+        const nextUrl = `${window.location.pathname}${window.location.hash || ''}`;
+        window.history.replaceState(null, '', nextUrl);
+      }
+    }
     setImageSrc(null); setOriginalImage(null);
     setMaskCanvasData(null);
     setZoom(1); setPanX(0); setPanY(0); setPanMode(false);
-    setShowReference(true);
+    setShowReference(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
     // Reset mask canvas
     if (maskCanvasRef.current) {
@@ -1245,6 +1356,36 @@ export default function RemoveShadowTool({
         setHistoryStep(nextStep);
     }
   };
+  const modeOptions = [
+    { value: 'object', label: 'Remove Object' },
+    { value: 'person', label: 'Remove Person' },
+    { value: 'text', label: 'Remove Emoji from Photo' },
+    { value: 'shadow', label: 'Remove Shadow' }
+  ] as const;
+  const modeLabel = modeOptions.find((item) => item.value === editorMode)?.label || 'Remove Object';
+  const modeProcessingLabel = editorMode === 'shadow'
+    ? 'Removing shadow...'
+    : editorMode === 'glare'
+      ? 'Removing glare...'
+      : editorMode === 'person'
+        ? 'Removing person...'
+        : editorMode === 'text'
+          ? 'Removing text...'
+          : 'Removing objects...';
+  const modeMaskHint = editorMode === 'shadow'
+    ? 'Select shadow area'
+    : editorMode === 'glare'
+      ? 'Select glare area (beta)'
+      : 'Select object / person / text area';
+  const modeHelperText = editorMode === 'shadow'
+    ? 'Best for dark cast shadows. Brush the shadow area, then click Remove.'
+    : editorMode === 'glare'
+      ? 'Beta mode for shiny highlights and reflections.'
+      : editorMode === 'text'
+        ? 'Erase text, logos, and watermarks by brushing over letters.'
+        : editorMode === 'person'
+          ? 'Remove people and crowds from backgrounds.'
+          : 'General mode for objects and small distractions.';
 
   return (
     <>
@@ -1257,14 +1398,14 @@ export default function RemoveShadowTool({
       <input id="file-upload" name="file-upload" type="file" className="hidden" ref={fileInputRef} onChange={handleUpload} accept="image/png, image/jpeg, image/webp" />
       {!imageSrc && <Header locale={locale} page={pageName} />}
       <main className="isolate bg-slate-50">
-        <Script id={`${pageName}-ld`} type="application/ld+json">
+        <Script id={`${pageName || 'home'}-ld`} type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebPage",
             "name": pageText.h1,
             "description": pageText.description,
             "inLanguage": locale === "default" ? "en" : locale,
-            "isPartOf": { "@type": "WebSite", "name": process.env.NEXT_PUBLIC_DOMAIN_NAME }
+            "isPartOf": { "@type": "WebSite", "name": isHomeTool ? "CleanupPictures" : (process.env.NEXT_PUBLIC_DOMAIN_NAME || "CleanupPictures") }
           })}
         </Script>
         
@@ -1275,7 +1416,15 @@ export default function RemoveShadowTool({
            </div>
            <div className="mx-auto max-w-7xl px-6 lg:px-8">
              <div className={`mx-auto max-w-5xl text-center mb-10 transition-all duration-500 ${imageSrc ? 'opacity-0 h-0 overflow-hidden mb-0 scale-95' : 'opacity-100 scale-100'}`}>
-                <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl lg:whitespace-nowrap">{pageText.h1}</h1>
+                <h1 className={`text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl ${isHomeTool ? 'max-w-4xl mx-auto leading-tight' : 'lg:whitespace-nowrap'}`}>
+                  {isHomeTool ? (
+                    <>
+                      <span className="whitespace-nowrap">Remove Objects, Text, People</span>
+                      <br className="hidden sm:block" />
+                      <span className="whitespace-nowrap">from Images Instantly</span>
+                    </>
+                  ) : pageText.h1}
+                </h1>
                 <p className="mt-6 text-lg leading-8 text-slate-600">{pageText.description}</p>
                 <div className="mt-8 flex items-center justify-center gap-x-6">
                   <button onClick={() => samplesRef.current?.scrollIntoView({ behavior: 'smooth' })} className="rounded-full bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 transition-all duration-300">
@@ -1291,7 +1440,7 @@ export default function RemoveShadowTool({
                ref={workspaceRef}
               className={`mx-auto transition-all duration-700 ease-in-out ${
                 !imageSrc
-                  ? 'w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center'
+                  ? (isHomeTool ? 'w-full max-w-3xl' : 'w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center')
                   : 'w-full'
               }`}
                onDrop={handleDrop}
@@ -1299,7 +1448,7 @@ export default function RemoveShadowTool({
              >
                {!imageSrc ? (
                  <>
-                   <div className="hidden lg:flex w-full aspect-video rounded-3xl bg-slate-900/5 border border-slate-200/60 shadow-inner items-center justify-center overflow-hidden relative group backdrop-blur-sm">
+                   {!isHomeTool && <div className="hidden lg:flex w-full aspect-video rounded-3xl bg-slate-900/5 border border-slate-200/60 shadow-inner items-center justify-center overflow-hidden relative group backdrop-blur-sm">
                      <div className="absolute inset-0 bg-gradient-to-tr from-slate-100/50 to-white/30 opacity-50"></div>
                      <div className="relative z-10 flex flex-col items-center gap-4 transition-transform duration-300 group-hover:scale-105">
                        <div className="w-20 h-20 rounded-full bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center text-primary-500 ring-1 ring-slate-100">
@@ -1309,7 +1458,7 @@ export default function RemoveShadowTool({
                        </div>
                        <p className="text-slate-500 font-medium bg-white/80 px-4 py-1.5 rounded-full shadow-sm text-sm backdrop-blur-md">Watch Demo</p>
                      </div>
-                   </div>
+                   </div>}
                    <div className="w-full max-w-xl mx-auto">
                      <div
                        className="relative flex flex-col items-center justify-center gap-6 p-10 rounded-3xl border-2 border-dashed border-slate-300 bg-white/40 backdrop-blur-md hover:border-primary-400 hover:bg-white/60 hover:shadow-xl hover:scale-[1.01] transition-all duration-300 cursor-pointer group"
@@ -1323,9 +1472,21 @@ export default function RemoveShadowTool({
                            </svg>
                          </div>
                          <div className="text-center space-y-2">
-                           <h2 className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
-                          <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">{toolText.uploadDesc}</p>
-                           <p className="text-xs text-slate-400">{toolText.uploadSubDesc}</p>
+                          {isHomeTool ? (
+                            <p className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</p>
+                          ) : (
+                            <h2 className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
+                          )}
+                         {isHomeTool ? (
+                           <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">Drop your photo here, or click to upload and start editing.</p>
+                         ) : (
+                           <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">{toolText.uploadDesc}</p>
+                         )}
+                          {isHomeTool ? (
+                            <p className="text-xs text-slate-400">Supports JPG, PNG, and WebP. You can also paste an image with Ctrl+V.</p>
+                          ) : (
+                            <p className="text-xs text-slate-400">{toolText.uploadSubDesc}</p>
+                          )}
                          </div>
                        </div>
                        <div className="relative z-10 flex flex-col items-center gap-3">
@@ -1334,6 +1495,18 @@ export default function RemoveShadowTool({
                          </div>
                        </div>
                      </div>
+                     {isHomeTool && (
+                       <div className="mt-5">
+                         <p className="text-center text-sm text-slate-500 mb-3">No image? Try one of these</p>
+                         <div className="flex items-center justify-center gap-3 flex-wrap">
+                           {SAMPLES.slice(0, 4).map((sample) => (
+                             <button key={sample.id} onClick={() => loadSample(sample)} className="group rounded-xl border border-slate-200 bg-white p-1.5 hover:border-primary-300 hover:shadow-md transition-all">
+                               <img src={sample.beforeUrl} alt={sample.title} className="w-24 h-16 object-cover rounded-lg" />
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+                     )}
                    </div>
                  </>
                ) : (
@@ -1357,13 +1530,36 @@ export default function RemoveShadowTool({
                        <div className="h-6 w-px bg-slate-200 hidden lg:block"></div>
                        <button
                          onClick={() => setShowReference(!showReference)}
-                         className={`hidden lg:inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${showReference ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-100'}`}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${showReference ? 'bg-primary-50 text-primary-700' : 'text-slate-600 hover:bg-slate-100'}`}
                        >
                          <Squares2X2Icon className="w-4 h-4" />
                          <span>Reference</span>
                        </button>
                      </div>
-                    <div className="flex items-center gap-3 lg:gap-5 ml-auto flex-wrap">
+                   <div className="flex items-center gap-3 lg:gap-5 ml-auto flex-wrap">
+                        <div className="lg:hidden flex items-center gap-2 border-l pl-3 border-slate-200">
+                          <Menu as="div" className="relative inline-block text-left">
+                            <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                              {modeLabel}
+                              <ChevronDownIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                            </Menu.Button>
+                            <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
+                              <Menu.Items className="absolute right-0 z-[3000] mt-2 w-48 origin-top-right divide-y divide-slate-100 rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                <div className="py-1">
+                                  {modeOptions.map((mode) => (
+                                    <Menu.Item key={mode.value}>
+                                      {({ active }) => (
+                                        <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm`} onClick={() => setEditorMode(mode.value)}>
+                                          {mode.label}
+                                        </button>
+                                      )}
+                                    </Menu.Item>
+                                  ))}
+                                </div>
+                              </Menu.Items>
+                            </Transition>
+                          </Menu>
+                        </div>
                          <PaintBrushIcon className="w-5 h-5 text-slate-400" />
                          <div className="flex flex-col gap-1 w-24 lg:w-32">
                            <input
@@ -1397,41 +1593,14 @@ export default function RemoveShadowTool({
                        <button onClick={handleClearMask} className="text-xs text-red-600 hover:text-red-700 font-medium px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-md transition-colors whitespace-nowrap">
                          Clear
                        </button>
-                     <div className="flex items-center gap-2 border-l pl-4 border-slate-200">
-                         <Menu as="div" className="relative inline-block text-left">
-                           <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-                             {sceneType === 'general' ? 'General' :
-                              sceneType === 'person' ? 'Person' :
-                              sceneType === 'portrait' ? 'Portrait' :
-                              sceneType === 'building' ? 'Building' :
-                              'Object'}
-                             <ChevronDownIcon className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                           </Menu.Button>
-                           <Transition enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100" leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95">
-                            <Menu.Items className="absolute right-0 z-[3000] mt-2 w-40 origin-top-right divide-y divide-slate-100 rounded-xl bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                               <div className="py-1">
-                                 {['general', 'person', 'portrait', 'building', 'object'].map(type => (
-                                   <Menu.Item key={type}>
-                                     {({ active }) => (
-                                       <button className={`${active ? 'bg-slate-50' : ''} text-slate-700 block w-full text-left px-4 py-2 text-sm capitalize`} onClick={() => setSceneType(type as any)}>
-                                         {type === 'person' ? 'Person (Body)' : type === 'portrait' ? 'Portrait (Face)' : type}
-                                       </button>
-                                     )}
-                                   </Menu.Item>
-                                 ))}
-                               </div>
-                             </Menu.Items>
-                           </Transition>
-                         </Menu>
-                       </div>
                      </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => handleGenerate()}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
+                        className="lg:hidden inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
                       >
                         <SparklesIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">{pageText.actionButton || 'Remove Shadow'}</span>
+                        <span className="hidden sm:inline">Remove</span>
                         <span className="sm:hidden">Run</span>
                       </button>
                       <button
@@ -1463,22 +1632,39 @@ export default function RemoveShadowTool({
                        </Menu>
                      </div>
                    </div>
-                   <div className="flex-1 relative flex overflow-hidden bg-slate-100" ref={wrapperRef}>
-                     {showReference && (
-                      <div className="hidden lg:flex lg:basis-[42%] lg:flex-none items-center justify-center bg-slate-200 border-r border-slate-300 relative overflow-hidden p-8">
-                         <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-medium z-10 shadow-sm border border-white/10">Original Reference</div>
-                         <img
-                           src={imageSrc!}
-                           alt="Reference"
-                           className="max-w-full max-h-full object-contain shadow-2xl rounded-lg ring-1 ring-black/10"
-                         />
-                       </div>
-                     )}
-                    <div onWheel={handleWheelZoom} className={`flex-1 ${showReference ? 'lg:basis-[58%] lg:flex-none' : ''} relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}>
+                  <div className="flex-1 relative flex overflow-hidden bg-slate-100" ref={wrapperRef}>
+                    <aside className="hidden lg:flex lg:w-72 xl:w-80 flex-col border-r border-slate-200 bg-white p-4 gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900">Mode</h3>
+                        <p className="mt-1 text-xs text-slate-500">{modeMaskHint}</p>
+                      </div>
+                      <div className="space-y-2">
+                        {modeOptions.map((mode) => (
+                          <button
+                            key={mode.value}
+                            onClick={() => setEditorMode(mode.value)}
+                            className={`w-full text-left rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${editorMode === mode.value ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                          >
+                            {mode.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handleGenerate()}
+                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-sm"
+                      >
+                        <SparklesIcon className="w-4 h-4" />
+                        Remove
+                      </button>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs text-slate-600 leading-relaxed">{modeHelperText}</p>
+                      </div>
+                    </aside>
+                   <div onWheel={showReference ? undefined : handleWheelZoom} className={`flex-1 relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${showReference ? 'cursor-default' : (panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair')}`}>
                       <div
                         className="relative inline-block shadow-2xl rounded-lg overflow-hidden ring-1 ring-slate-900/5 transition-transform duration-75 ease-linear origin-center will-change-transform"
                         style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}
-                        onMouseDown={handlePanStart}
+                        onMouseDown={showReference ? undefined : handlePanStart}
                       >
                          <img
                            ref={originalImageRef}
@@ -1490,50 +1676,50 @@ export default function RemoveShadowTool({
                           }}
                          />
                         <canvas ref={canvasRef} className="block w-auto h-auto max-w-full max-h-full" />
-                         <canvas
-                           ref={maskCanvasRef}
-                          className={`absolute inset-0 w-full h-full ${panMode ? 'pointer-events-none' : 'cursor-none'} opacity-100`}
-                           onMouseDown={handleDrawStart}
-                           onMouseMove={(e) => {
-                             if (isDrawing) return;
-                             if (cursorRef.current) {
-                               const rect = e.currentTarget.getBoundingClientRect();
-                               const x = e.clientX;
-                               const y = e.clientY;
-                               cursorRef.current.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+                        <canvas
+                          ref={maskCanvasRef}
+                          className={`absolute inset-0 w-full h-full ${panMode || showReference ? 'pointer-events-none' : 'cursor-none'} opacity-100`}
+                          onMouseDown={handleDrawStart}
+                          onMouseMove={(e) => {
+                            if (isDrawing || showReference) return;
+                            if (cursorRef.current) {
+                              const x = e.clientX;
+                              const y = e.clientY;
+                              cursorRef.current.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
                               const visualSize = brushSize;
-                               cursorRef.current.style.width = `${visualSize}px`;
-                               cursorRef.current.style.height = `${visualSize}px`;
-                               if (!panMode) cursorRef.current.style.opacity = '1';
-                             }
-                           }}
-                           onMouseEnter={() => { if (cursorRef.current && !panMode) cursorRef.current.style.opacity = '1'; }}
-                           onMouseLeave={() => { if (cursorRef.current) cursorRef.current.style.opacity = '0'; }}
-                         />
+                              cursorRef.current.style.width = `${visualSize}px`;
+                              cursorRef.current.style.height = `${visualSize}px`;
+                              if (!panMode) cursorRef.current.style.opacity = '1';
+                            }
+                          }}
+                          onMouseEnter={() => { if (cursorRef.current && !panMode && !showReference) cursorRef.current.style.opacity = '1'; }}
+                          onMouseLeave={() => { if (cursorRef.current) cursorRef.current.style.opacity = '0'; }}
+                        />
+                        {showReference && <img src={imageSrc!} alt="Reference" className="absolute inset-0 block w-full h-full object-contain bg-slate-200" />}
                        </div>
                       {isProcessing && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/30 backdrop-blur-sm z-50">
                           <div className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                            <p className="text-sm font-medium text-slate-700">{pageText.processingLabel || 'Removing shadow...'}</p>
+                            <p className="text-sm font-medium text-slate-700">{isHomeTool ? modeProcessingLabel : (pageText.processingLabel || modeProcessingLabel)}</p>
                           </div>
                         </div>
                       )}
-                     </div>
-                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1040] flex items-center gap-2 bg-white/90 backdrop-blur-md rounded-full px-3 py-2 shadow-xl border border-white/50 ring-1 ring-black/5">
-                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(0.9, e)} title="Zoom Out"><MagnifyingGlassMinusIcon className="w-5 h-5" /></button>
-                       <span className="text-xs font-semibold text-slate-600 w-12 text-center select-none">{Math.round(zoom * 100)}%</span>
-                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(1.1, e)} title="Zoom In"><MagnifyingGlassPlusIcon className="w-5 h-5" /></button>
-                       <div className="w-px h-4 bg-slate-300 mx-1"></div>
-                       <button className={`p-2 rounded-full transition-colors ${panMode ? 'bg-primary-100 text-primary-600' : 'hover:bg-slate-100 text-slate-600'}`} onClick={() => setPanMode(!panMode)} title="Pan Mode (Hold Space)">
-                         <HandRaisedIcon className="w-5 h-5" />
-                       </button>
-                       <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={resetView} title="Reset View"><ArrowPathIcon className="w-5 h-5" /></button>
-                     </div>
-                     <div className="absolute bottom-6 right-6 md:hidden z-[1040]">
-                       <button onClick={() => handleGenerate()} className="flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all active:scale-95">
-                         <SparklesIcon className="w-6 h-6" />
-                       </button>
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1040] flex items-center gap-2 bg-white/90 backdrop-blur-md rounded-full px-3 py-2 shadow-xl border border-white/50 ring-1 ring-black/5">
+                        <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(0.9, e)} title="Zoom Out"><MagnifyingGlassMinusIcon className="w-5 h-5" /></button>
+                        <span className="text-xs font-semibold text-slate-600 w-12 text-center select-none">{Math.round(zoom * 100)}%</span>
+                        <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={(e) => handleZoom(1.1, e)} title="Zoom In"><MagnifyingGlassPlusIcon className="w-5 h-5" /></button>
+                        <div className="w-px h-4 bg-slate-300 mx-1"></div>
+                        <button className={`p-2 rounded-full transition-colors ${panMode ? 'bg-primary-100 text-primary-600' : 'hover:bg-slate-100 text-slate-600'}`} onClick={() => setPanMode(!panMode)} title="Pan Mode (Hold Space)">
+                          <HandRaisedIcon className="w-5 h-5" />
+                        </button>
+                        <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={resetView} title="Reset View"><ArrowPathIcon className="w-5 h-5" /></button>
+                      </div>
+                      <div className="absolute bottom-6 right-6 md:hidden z-[1040]">
+                        <button onClick={() => handleGenerate()} className="flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all active:scale-95">
+                          <SparklesIcon className="w-6 h-6" />
+                        </button>
+                      </div>
                      </div>
                    </div>
                  </div>
@@ -1547,6 +1733,25 @@ export default function RemoveShadowTool({
         <>
         {/* Content Section */}
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-20 space-y-20">
+            {Array.isArray(pageText.removeItems) && pageText.removeItems.length > 0 && (
+              <section className="scroll-mt-24">
+                <div className="text-center mb-10">
+                  <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">{pageText.removeWhatTitle || 'What can you remove?'}</h2>
+                </div>
+                <div className="flex flex-wrap items-stretch gap-3 md:gap-4 justify-center">
+                  {pageText.removeItems.map((item: any, idx: number) => (
+                    <Link
+                      key={`${item.href}-${idx}`}
+                      href={getLinkHref(locale, item.href)}
+                      className={`group inline-flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-slate-800 font-medium hover:border-primary-300 hover:text-primary-700 transition-colors ${idx % 3 === 0 ? 'min-w-[280px]' : idx % 3 === 1 ? 'min-w-[320px]' : 'min-w-[300px]'}`}
+                    >
+                      <span className="leading-relaxed">{item.label}</span>
+                      <span className="text-slate-400 group-hover:text-primary-600 transition-colors">{'>'}</span>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
             {/* Sample Gallery */}
             <section ref={samplesRef} className="scroll-mt-24">
                 <div className="text-center mb-16">
@@ -1554,6 +1759,54 @@ export default function RemoveShadowTool({
                     <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mb-4">{pageText.sampleTitle || 'Try with Samples'}</h2>
                     <p className="text-lg text-slate-600 max-w-3xl mx-auto leading-relaxed">{pageText.sampleDesc || 'Click any sample below to load it into the editor.'}</p>
                 </div>
+                {isHomeTool ? (
+                  <div className="space-y-8">
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      {HOME_USE_CASES.map((useCase) => (
+                        <button
+                          key={useCase.key}
+                          onClick={() => setActiveHomeUseCase(useCase.key)}
+                          className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${activeHomeUseCase === useCase.key ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-primary-300 hover:text-primary-700'}`}
+                        >
+                          {useCase.label}
+                        </button>
+                      ))}
+                    </div>
+                    {(() => {
+                      const useCase = HOME_USE_CASES.find((item) => item.key === activeHomeUseCase) || HOME_USE_CASES[0];
+                      const sample = SAMPLES.find((item) => item.id === useCase.sampleId) || SAMPLES[0];
+                      return (
+                        <article key={sample.id} className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-sm p-6 lg:p-8">
+                          <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 pointer-events-none"></div>
+                          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+                            <div className="text-left space-y-6">
+                              <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white">{useCase.label}</div>
+                              <div>
+                                <h3 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-3">{sample.title}</h3>
+                                <p className="text-base lg:text-lg text-slate-600 leading-relaxed">{sample.desc}</p>
+                              </div>
+                              <button onClick={() => loadSample(sample)} className="group/btn inline-flex items-center gap-2 rounded-full bg-slate-900 hover:bg-primary-600 text-white font-semibold px-6 py-3 shadow-lg shadow-slate-900/20 hover:shadow-primary-500/30 transition-all duration-300">
+                                {pageText.trySampleBtn || 'Try this sample'}
+                                <ArrowRightIcon className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+                              </button>
+                            </div>
+                            <div className="w-full cursor-pointer" onClick={() => loadSample(sample)}>
+                              <div className="relative rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-300/40">
+                                <ComparisonSlider 
+                                  beforeUrl={sample.beforeUrl}
+                                  afterUrl={sample.afterUrl}
+                                  imageFit="cover"
+                                  imagePosition={sample.imagePosition || 'center center'}
+                                  className="aspect-[16/10] rounded-xl overflow-hidden"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })()}
+                  </div>
+                ) : (
                 <div className="space-y-24">
                     {SAMPLES.map((sample, index) => (
                         <article key={sample.id} className={`group relative overflow-hidden rounded-3xl border border-slate-200 bg-white/80 shadow-xl shadow-slate-200/50 backdrop-blur-sm p-6 lg:p-8 ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
@@ -1586,11 +1839,12 @@ export default function RemoveShadowTool({
                         </article>
                     ))}
                 </div>
+                )}
             </section>
 
             <section className="relative overflow-hidden rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 transition-all hover:shadow-2xl hover:bg-white/70">
                 <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-6">{toolText.aboutTitle}</h2>
+                <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-6">{pageText.aboutTitle || toolText.aboutTitle}</h2>
                 <div className="prose prose-lg prose-slate max-w-none">
                     <p className="text-slate-600 leading-relaxed">{pageText.aboutDesc}</p>
                     {pageText.featureTitle && (
@@ -1608,7 +1862,28 @@ export default function RemoveShadowTool({
                 </div>
             </section>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {isHomeTool ? (
+              <section ref={howToUseRef} className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 scroll-mt-24">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-2">How to Remove Objects from Photos — Step by Step</h2>
+                <p className="text-slate-600 mb-8">Remove unwanted objects from your images in just a few seconds.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { title: "Upload Image", desc: "Upload your photo from your device or computer." },
+                    { title: "Highlight the Area to Erase", desc: "Brush over the object, person, or text you want to remove." },
+                    { title: "AI Auto-Magic Removal", desc: "The editor instantly removes the selected area and fills the background naturally." },
+                    { title: "Download Your Clean Photo", desc: "Save your edited image in high quality with no watermark." }
+                  ].map((step, i) => (
+                    <article key={step.title} className="rounded-2xl bg-white border border-slate-200 p-5">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="flex-none flex items-center justify-center w-7 h-7 rounded-full bg-primary-100 text-primary-600 font-bold text-xs">{i + 1}</span>
+                        <h3 className="font-semibold text-slate-900">{step.title}</h3>
+                      </div>
+                      <p className="text-sm text-slate-600 leading-relaxed">{step.desc}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <section ref={howToUseRef} className="rounded-3xl bg-white/60 backdrop-blur-xl border border-white/50 shadow-xl p-8 lg:p-12 h-full transition-all hover:shadow-2xl hover:bg-white/70 scroll-mt-24">
                     <h2 className="text-2xl font-bold tracking-tight text-slate-900 mb-6">{pageText.howTitle || pageText.howToUseTitle || toolText.stepTitle}</h2>
                     <ul className="space-y-4">
@@ -1632,13 +1907,13 @@ export default function RemoveShadowTool({
                         ))}
                     </div>
                 </section>
-            </div>
+            </div>}
 
             <section className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl px-8 py-10 lg:px-12 lg:py-14">
                 <div className="absolute -top-24 -right-16 w-72 h-72 rounded-full bg-primary-500/20 blur-3xl pointer-events-none"></div>
                 <div className="absolute -bottom-20 -left-16 w-72 h-72 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none"></div>
                 <h2 className="relative text-3xl font-bold tracking-tight text-white mb-3">{toolText.faqTitle}</h2>
-                <p className="relative text-slate-300 mb-10 max-w-3xl">Everything you need to know before editing your first shadow-heavy photo.</p>
+                <p className="relative text-slate-300 mb-10 max-w-3xl">{isHomeTool ? "Everything you need to know before cleaning up your first photo." : "Everything you need to know before editing your first shadow-heavy photo."}</p>
                 <div className="relative grid grid-cols-1 md:grid-cols-2 gap-5">
                     {[
                         { q: pageText.faq1Q, a: pageText.faq1A },

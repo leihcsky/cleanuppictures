@@ -8,23 +8,23 @@ export async function generateMetadata({ params: { locale } }) {
   const brand = 'CleanupPictures';
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
-  const title = "Remove Shadow from Photo Online | AI Shadow Remover";
-  const description = "Remove shadow from photo online with AI. Fix harsh shadows fast and export clean results as JPG, PNG, or WebP.";
+  const canonicalUrl = origin ? `${origin}/${locale}/remove-emoji-from-photo` : `/${locale}/remove-emoji-from-photo`;
+  const title = "Remove Emoji from Photo Online | AI Emoji Remover";
+  const description = "Remove emoji, stickers, and overlays from photos online with AI. Fast cleanup with natural results and JPG, PNG, WebP export.";
   return {
     title,
     description,
     keywords: [
-      "remove shadow from photo",
-      "remove shadow from image online",
-      "ai shadow remover",
-      "shadow remover tool",
-      "reduce harsh shadows",
-      "fix photo lighting online",
-      "remove shadow from face",
-      "brighten dark areas in photos",
-      "product photo shadow removal",
-      "portrait shadow cleanup"
+      "remove emoji from photo",
+      "remove emoji from image online",
+      "emoji remover",
+      "erase emoji from photo",
+      "remove sticker from photo",
+      "remove emoji overlay",
+      "remove icon from image",
+      "ai emoji remover",
+      "photo emoji remover free",
+      "online emoji eraser"
     ],
     alternates: { canonical: canonicalUrl },
     openGraph: {
@@ -44,64 +44,64 @@ export async function generateMetadata({ params: { locale } }) {
   };
 }
 
-export default function RemoveShadowPage({ params: { locale } }) {
+export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
   const brand = 'CleanupPictures';
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const pageUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
-  const homeModeHref = `${getLinkHref(locale, '')}?mode=shadow`;
+  const pageUrl = origin ? `${origin}/${locale}/remove-emoji-from-photo` : `/${locale}/remove-emoji-from-photo`;
+  const homeModeHref = `${getLinkHref(locale, '')}?mode=text`;
   const cases = [
     {
-      title: "Portrait shadow cleanup",
-      desc: "Reduce harsh facial shadows from sunlight, hats, and side lighting while keeping skin detail natural.",
-      note: "Best for portraits where strong side light creates dark facial patches and uneven tone.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png"
+      title: "Social media cleanup",
+      desc: "Remove emoji stickers and decorative overlays from social posts to recover cleaner visuals.",
+      note: "Perfect for reposting social content when emoji overlays hide key visual information.",
+      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
+      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
     },
     {
-      title: "Product photo lighting fix",
-      desc: "Clean up hard cast shadows on products for brighter and more conversion-ready ecommerce images.",
-      note: "Useful for listings where heavy shadows hide key product details and texture.",
+      title: "Product image polish",
+      desc: "Erase emoji annotations and icon marks from product shots for more professional listings.",
+      note: "Useful for ecommerce images that need a cleaner look before publishing to marketplaces.",
       beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
       afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
     },
     {
-      title: "Document and interior cleanup",
-      desc: "Reduce dark shadow regions in documents, walls, or room corners for clearer presentation photos.",
-      note: "Great for interiors and document shots where dark corners make the image look dull.",
+      title: "Presentation-ready photos",
+      desc: "Remove playful stickers and emoji labels from shared images when you need a cleaner final version.",
+      note: "Great for team decks and reports where clean, distraction-free visuals are required.",
       beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
       afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
     }
   ];
   const faqItems = [
-    { q: "Is this remove shadow from photo tool free?", a: "You can start for free and process common shadow cleanup edits online." },
-    { q: "Can I remove hard facial shadows from portraits?", a: "Yes. Brush over dark shadow regions and run cleanup to brighten and rebalance the area." },
-    { q: "How do I get better blending at shadow edges?", a: "Brush slightly beyond the shadow boundary so the AI can blend transitions naturally." },
-    { q: "Can I use this for product and listing photos?", a: "Yes. It works well for ecommerce products, real-estate photos, and marketing assets." },
+    { q: "Is this remove emoji from photo tool free?", a: "You can start for free and remove common emoji overlays online." },
+    { q: "Can I remove stickers and icon overlays too?", a: "Yes. The same process can erase emoji, stickers, and icon-like marks." },
+    { q: "How do I get clean blending after emoji removal?", a: "Brush slightly wider than the emoji edge so AI can rebuild nearby texture naturally." },
+    { q: "Can I use this for ecommerce and social assets?", a: "Yes. It works for product photos, social media creatives, and promo visuals." },
     { q: "What image formats are supported?", a: "Input and export support JPG, PNG, and WebP." },
-    { q: "Can I fix shadows in only one area of the photo?", a: "Yes. Brush only the shadow region you want to improve, so the rest of the image stays untouched." }
+    { q: "Can I remove multiple emoji or stickers in one image?", a: "Yes. Select multiple emoji or sticker areas and remove them together, then refine any leftovers in another pass." }
   ];
   const pageSchema = [
     {
       "@context": "https://schema.org",
       "@type": "WebPage",
-      "name": "Remove Shadow from Photo Online",
-      "description": "Remove shadow from photos online with AI for portraits, ecommerce, and interior photography.",
+      "name": "Remove Emoji from Photo Online",
+      "description": "Remove emoji from photos online with AI for social media, ecommerce, and content cleanup.",
       "url": pageUrl,
       "inLanguage": locale
     },
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "AI Shadow Remover",
+      "name": "AI Emoji Remover",
       "applicationCategory": "PhotographyApplication",
       "operatingSystem": "Web",
       "url": pageUrl,
-      "description": "AI tool to reduce harsh shadows from photos while preserving natural texture.",
+      "description": "AI tool to remove emoji overlays from photos while preserving natural background details.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "featureList": [
-        "Remove shadow from photo online",
-        "Fix hard cast shadows and dark areas",
+        "Remove emoji from photo online",
+        "Erase stickers and overlays",
         "Brush-based local cleanup steps",
         "JPG PNG WebP export"
       ]
@@ -120,7 +120,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": brand, "item": origin ? `${origin}/${locale}` : `/${locale}` },
-        { "@type": "ListItem", "position": 2, "name": "Remove Shadow from Photo", "item": pageUrl }
+        { "@type": "ListItem", "position": 2, "name": "Remove Emoji from Photo", "item": pageUrl }
       ]
     }
   ];
@@ -128,15 +128,15 @@ export default function RemoveShadowPage({ params: { locale } }) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
-      <Header locale={locale} page="remove-shadow" />
+      <Header locale={locale} page="remove-emoji-from-photo" />
       <main className="bg-slate-50 pt-28">
         <div className="mx-auto max-w-6xl px-6 py-12 lg:py-16">
-          <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight">Remove Shadow from Photo Online</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight">Remove Emoji from Photo Online</h1>
           <p className="mt-4 text-lg text-slate-600 max-w-3xl">
-            Remove harsh shadows from photos in seconds with AI. Fix uneven lighting while keeping natural texture and clean visual balance.
+            Remove emoji overlays from photos in seconds with AI. Clean up stickers, icon marks, and decorative emoji while keeping natural texture and composition.
           </p>
           <p className="mt-3 text-slate-600 max-w-3xl">
-            Great for portraits, ecommerce product photos, and interior images where shadows reduce clarity.
+            Great for social media cleanup, ecommerce visuals, and content teams that need polished images.
           </p>
 
           <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -144,11 +144,11 @@ export default function RemoveShadowPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg" alt="Before remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg" alt="Before remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png" alt="After remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg" alt="After remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>
@@ -156,7 +156,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
           </div>
 
           <section className="mt-14 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-slate-900">How to remove shadow from photos online</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">How to remove emoji from photos online</h2>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 1</p>
@@ -165,30 +165,30 @@ export default function RemoveShadowPage({ params: { locale } }) {
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 2</p>
-                <h3 className="mt-2 font-semibold text-slate-900">Brush shadow areas</h3>
-                <p className="mt-2 text-sm text-slate-600">Paint over shadow regions and include a small edge around dark boundaries.</p>
+                <h3 className="mt-2 font-semibold text-slate-900">Brush emoji area</h3>
+                <p className="mt-2 text-sm text-slate-600">Paint over each emoji or sticker and include a small border around the edge.</p>
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 3</p>
-                <h3 className="mt-2 font-semibold text-slate-900">Download balanced result</h3>
-                <p className="mt-2 text-sm text-slate-600">Run cleanup, review the result, then export your final image in high quality.</p>
+                <h3 className="mt-2 font-semibold text-slate-900">Download clean image</h3>
+                <p className="mt-2 text-sm text-slate-600">Run removal, check the result, then export your final image in high quality.</p>
               </div>
             </div>
           </section>
 
           <section className="mt-14 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-slate-900">Why use this AI shadow remover</h2>
+            <h2 className="text-2xl font-semibold text-slate-900">Why use this AI emoji remover</h2>
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Fast shadow correction</h3><p className="mt-2 text-sm text-slate-600">Clean up harsh shadows quickly without complicated manual retouching.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Natural lighting balance</h3><p className="mt-2 text-sm text-slate-600">AI reconstructs nearby regions to keep transitions smooth and realistic.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works for many scenarios</h3><p className="mt-2 text-sm text-slate-600">Useful for portraits, product photos, room photos, and marketing images.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Online and easy to use</h3><p className="mt-2 text-sm text-slate-600">No software installation needed. Edit and export directly in your browser.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Simple cleanup flow</h3><p className="mt-2 text-sm text-slate-600">Upload, brush, and remove in a few clicks without complex editing tools.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Natural background fill</h3><p className="mt-2 text-sm text-slate-600">AI rebuilds nearby texture so removed emoji areas look more realistic.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works for different content</h3><p className="mt-2 text-sm text-slate-600">Use it on social images, product photos, and branded visuals.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Online and fast</h3><p className="mt-2 text-sm text-slate-600">No installation needed. Edit and export directly in your browser.</p></div>
             </div>
           </section>
 
           <section className="mt-14">
             <h2 className="text-3xl font-bold text-slate-900">Use cases and results</h2>
-            <p className="mt-3 text-slate-600">See how shadow removal improves clarity across different photo types.</p>
+            <p className="mt-3 text-slate-600">See how emoji removal helps clean up different visual scenarios.</p>
             <div className="mt-7 space-y-8">
               {cases.map((item) => (
                 <article key={item.title} className="rounded-3xl border border-slate-200 bg-white p-6 lg:p-8 shadow-sm">
@@ -226,7 +226,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
           </section>
         </div>
       </main>
-      <Footer locale={locale} page="remove-shadow" />
+      <Footer locale={locale} page="remove-emoji-from-photo" />
     </>
   );
 }

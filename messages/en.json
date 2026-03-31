@@ -93,13 +93,13 @@
     "searchButtonText": "Search"
   },
   "MenuText": {
-    "header0": "CleanupPictures",
+    "header0": "PicCleaner",
     "header1": "Remove Shadow",
     "header2": "Remove Emoji",
     "header3": "Remove Color",
     "header4": "Remove Glare",
     "home": "Home",
-    "tools": "Tools",
+    "tools": "Tool",
     "pricing": "Pricing",
     "footerLegal": "Legal",
     "footerLegal0": "Privacy Policy",

@@ -1,12 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, SwatchIcon, SunIcon, HomeIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon } from '@heroicons/react/24/outline'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { languages } from "~/i18n/config";
 import { useCommonContext } from '~/context/common-context'
 import LoadingModal from "./LoadingModal";
@@ -28,6 +29,7 @@ export default function Header({
     authText,
     menuText
   } = useCommonContext();
+  const pathname = usePathname();
 
   const [pageResult] = useState(getLinkHref(locale, page))
 
@@ -44,6 +46,9 @@ export default function Header({
       setShowLoadingModal(true);
     }
   }
+  useEffect(() => {
+    setShowLoadingModal(false);
+  }, [pathname, setShowLoadingModal]);
 
   return (
     <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-7xl rounded-2xl border border-white/50 bg-white/70 backdrop-blur-xl shadow-lg transition-all duration-300">
@@ -68,8 +73,8 @@ export default function Header({
             className="-m-1.5 p-1.5 transition-transform hover:scale-105"
             onClick={() => checkLocalAndLoading(locale)}>
             <img
-              className="h-8 w-auto"
-              src="/website.svg"
+              className="h-9 w-auto"
+              src="/website.svg?v=3"
               width={32}
               height={24}
               alt={process.env.NEXT_PUBLIC_DOMAIN_NAME}
@@ -89,77 +94,19 @@ export default function Header({
         <div className="hidden lg:flex lg:gap-x-8 items-center">
           <Link
              href={getLinkHref(locale, '')}
-             onClick={() => checkLocalAndLoading(locale)}
+             onClick={() => checkPageAndLoading('')}
              className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
-             <HomeIcon className="w-5 h-5" />
-             {menuText.home}
+             <Squares2X2Icon className="w-5 h-5" />
+             {menuText.tools}
            </Link>
 
-          <Menu as="div" className="relative inline-block text-left">
-            <div>
-              <Menu.Button className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-transparent py-2 text-base font-medium text-slate-700 hover:text-primary-600 transition-colors items-center">
-                <Squares2X2Icon className="w-5 h-5" />
-                {menuText.tools}
-                <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-400" aria-hidden="true" />
-              </Menu.Button>
-            </div>
-            <Transition
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <Menu.Items className="absolute left-0 z-40 mt-2 w-56 origin-top-left divide-y divide-gray-100 rounded-xl bg-white/90 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                <div className="py-1 p-1">
-                  <Menu.Item>
-                    {({ active }) => (
-                      <Link
-                        href={getLinkHref(locale, 'remove-color')}
-                        onClick={() => checkPageAndLoading('remove-color')}
-                        className={`${
-                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
-                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
-                      >
-                        <SwatchIcon className="w-5 h-5" />
-                        {menuText.header3}
-                      </Link>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
-                      <Link
-                        href={getLinkHref(locale, 'remove-shadow')}
-                        onClick={() => checkPageAndLoading('remove-shadow')}
-                        className={`${
-                          active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
-                        } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
-                      >
-                        <SunIcon className="w-5 h-5" />
-                        {menuText.header1}
-                      </Link>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                     {({ active }) => (
-                       <Link
-                         href={getLinkHref(locale, 'remove-glare')}
-                         onClick={() => checkPageAndLoading('remove-glare')}
-                         className={`${
-                           active ? 'bg-primary-50 text-primary-600' : 'text-slate-700'
-                         } group flex w-full items-center rounded-lg px-2 py-2 text-sm gap-2 transition-colors`}
-                       >
-                         <SparklesIcon className="w-5 h-5" />
-                         {menuText.header4}
-                       </Link>
-                     )}
-                   </Menu.Item>
-                </div>
-              </Menu.Items>
-            </Transition>
-          </Menu>
+          <Link
+            href={getLinkHref(locale, 'features')}
+            onClick={() => checkPageAndLoading('features')}
+            className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
+            <SparklesIcon className="w-5 h-5" />
+            Features
+          </Link>
 
           <Link
             href={getLinkHref(locale, 'pricing')}
@@ -232,8 +179,8 @@ export default function Header({
               <Link href={getLinkHref(locale, '')} className="-m-1.5 ml-0.5 p-1.5"
                 onClick={() => checkLocalAndLoading(locale)}>
                 <img
-                  className="h-8 w-auto"
-                  src="/website.svg"
+                  className="h-9 w-auto"
+                  src="/website.svg?v=3"
                   width={32}
                   height={24}
                   alt={process.env.NEXT_PUBLIC_DOMAIN_NAME}
@@ -254,37 +201,17 @@ export default function Header({
               <div className="space-y-2 py-6">
                  <Link
                    href={getLinkHref(locale, '')}
-                   onClick={() => checkLocalAndLoading(locale)}
+                   onClick={() => checkPageAndLoading('')}
                    className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
-                   <HomeIcon className="w-5 h-5" />
-                   {menuText.home}
-                 </Link>
-
-                 <div className="text-base font-semibold leading-7 text-slate-500 pt-4 pb-2 px-1 flex items-center gap-2">
-                    <Squares2X2Icon className="w-5 h-5" />
-                    {menuText.tools}
-                 </div>
-
-                 <Link
-                  href={getLinkHref(locale, 'remove-color')}
-                  onClick={() => checkPageAndLoading('remove-color')}
-                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                  <SwatchIcon className="w-5 h-5" />
-                  {menuText.header3}
+                   <Squares2X2Icon className="w-5 h-5" />
+                   {menuText.tools}
                  </Link>
                  <Link
-                  href={getLinkHref(locale, 'remove-shadow')}
-                  onClick={() => checkPageAndLoading('remove-shadow')}
-                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                  <SunIcon className="w-5 h-5" />
-                  {menuText.header1}
-                 </Link>
-                 <Link
-                  href={getLinkHref(locale, 'remove-glare')}
-                  onClick={() => checkPageAndLoading('remove-glare')}
-                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2 pl-6">
-                  <SparklesIcon className="w-5 h-5" />
-                  {menuText.header4}
+                   href={getLinkHref(locale, 'features')}
+                   onClick={() => checkPageAndLoading('features')}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
+                   <SparklesIcon className="w-5 h-5" />
+                   Features
                  </Link>
 
                  <div className="border-t border-gray-100 my-2"></div>
