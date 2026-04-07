@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 90",
+    "dev": "next dev --port 80",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "db:init:mysql": "node scripts/init-mysql.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
@@ -17,6 +18,7 @@
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
     "google-auth-library": "^9.6.3",
+    "mysql2": "^3.20.0",
     "next": "14.2.25",
     "next-auth": "^4.24.6",
     "next-intl": "^3.26.0",

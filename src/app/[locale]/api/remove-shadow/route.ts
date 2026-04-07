@@ -1,4 +1,8 @@
 import { getReplicateClient } from "~/libs/replicateClient";
+import { getDb } from "~/libs/db";
+import { getBusinessDateString } from "~/libs/date";
+import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server";
 
 // KIE API Configuration
 const KIE_UPLOAD_BASE_URL = "https://kieai.redpandaai.co";
@@ -39,6 +43,167 @@ interface KieTaskDetailsResponse {
     url?: string;
     results?: string[] | { url: string }[];
   };
+}
+
+const GUEST_COOKIE_KEY = "cp_guest_user_id";
+const FREE_DAILY_LIMIT = Number(process.env.FREE_TIMES || 3);
+
+type UserAccessContext = {
+  userId: number;
+  isGuest: boolean;
+  isSubscribed: boolean;
+  creditBalance: number;
+  isFreeTier: boolean;
+  todayUsedCount: number;
+  guestCookieValue?: string;
+};
+
+function getClientIp(req: NextRequest) {
+  return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+}
+
+function normalizeQuality(raw: any) {
+  const text = String(raw || "").toLowerCase();
+  if (text === "high" || text === "high_quality") {
+    return "high_quality";
+  }
+  return "standard";
+}
+
+function normalizeEditMode(raw: any) {
+  const text = String(raw || "").toLowerCase();
+  if (text === "object" || text === "text" || text === "person" || text === "shadow" || text === "glare") {
+    return text;
+  }
+  return "object";
+}
+
+/** Inpainting backbone: same as Standard. High Quality adds a SwinIR pass after this (see main POST). */
+function resolveModelVariant(
+  _quality: "standard" | "high_quality",
+  mode: "object" | "text" | "person" | "shadow" | "glare"
+) {
+  // One-shot backend routing: text-like overlays are better with semantic inpaint.
+  if (mode === "text") {
+    return "sd_inpaint";
+  }
+  if (mode === "object" || mode === "person") {
+    return "lama";
+  }
+  return "sd_inpaint";
+}
+
+function getCreditCost(quality: "standard" | "high_quality", isHd: boolean, isSubscribed: boolean) {
+  if (quality === "high_quality") {
+    return isSubscribed ? 1 : 2;
+  }
+  return 1 + (isHd ? (isSubscribed ? 0 : 1) : 0);
+}
+
+async function resolveOutputUrl(output: any): Promise<string> {
+  const candidate = Array.isArray(output) ? output[0] : output;
+  if (!candidate) return "";
+  if (typeof candidate === "string") return candidate;
+  if (typeof candidate?.url === "function") {
+    const maybeUrl = await candidate.url();
+    return typeof maybeUrl === "string" ? maybeUrl : "";
+  }
+  if (typeof candidate?.url === "string") return candidate.url;
+  if (typeof candidate?.href === "string") return candidate.href;
+  return String(candidate || "");
+}
+
+function buildResponse(payload: any, status: number, guestCookieValue?: string) {
+  const response = NextResponse.json(payload, { status });
+  if (guestCookieValue) {
+    response.cookies.set({
+      name: GUEST_COOKIE_KEY,
+      value: guestCookieValue,
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365
+    });
+  }
+  return response;
+}
+
+async function resolveUserContext(req: NextRequest) {
+  const db = getDb();
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const tokenUserId = Number(token?.user_id || 0);
+
+  if (tokenUserId > 0) {
+    const userRowRes = await db.query("select * from users where id=$1 limit 1", [tokenUserId]);
+    if (userRowRes.rows.length > 0) {
+      return {
+        userId: tokenUserId,
+        isGuest: false,
+        guestCookieValue: undefined
+      };
+    }
+  }
+
+  const cookieUserId = Number(req.cookies.get(GUEST_COOKIE_KEY)?.value || 0);
+  if (cookieUserId > 0) {
+    const guestRes = await db.query("select * from users where id=$1 limit 1", [cookieUserId]);
+    if (guestRes.rows.length > 0) {
+      return {
+        userId: cookieUserId,
+        isGuest: true,
+        guestCookieValue: String(cookieUserId)
+      };
+    }
+  }
+
+  const ip = getClientIp(req);
+  const guestName = `Guest_${Date.now()}`;
+  const insertRes = await db.query(
+    "insert into users(email,password_hash,user_name,user_image,is_guest,last_login_ip) values($1,$2,$3,$4,$5,$6)",
+    [null, null, guestName, null, true, ip]
+  );
+  let guestId = Number(insertRes.insertId || 0);
+  if (!guestId) {
+    const latestRes = await db.query("select id from users where is_guest=$1 order by id desc limit 1", [true]);
+    guestId = Number(latestRes.rows?.[0]?.id || 0);
+  }
+  return {
+    userId: guestId,
+    isGuest: true,
+    guestCookieValue: String(guestId)
+  };
+}
+
+async function ensureCreditsRow(userId: number) {
+  const db = getDb();
+  const rowRes = await db.query("select * from credits where user_id=$1 limit 1", [userId]);
+  if (rowRes.rows.length <= 0) {
+    await db.query("insert into credits(user_id,balance) values($1,$2)", [userId, 0]);
+    return 0;
+  }
+  return Number(rowRes.rows[0].balance || 0);
+}
+
+async function getTodayUsage(userId: number) {
+  const db = getDb();
+  const today = getBusinessDateString();
+  const rowRes = await db.query("select * from daily_usage where user_id=$1 and date=$2 limit 1", [userId, today]);
+  return {
+    today,
+    usedCount: rowRes.rows.length > 0 ? Number(rowRes.rows[0].used_count || 0) : 0,
+    rowId: rowRes.rows.length > 0 ? Number(rowRes.rows[0].id || 0) : 0
+  };
+}
+
+async function increaseTodayUsage(userId: number) {
+  const db = getDb();
+  const usage = await getTodayUsage(userId);
+  if (usage.rowId > 0) {
+    await db.query("update daily_usage set used_count=$1 where id=$2", [usage.usedCount + 1, usage.rowId]);
+  } else {
+    await db.query("insert into daily_usage(user_id,date,used_count) values($1,$2,$3)", [userId, usage.today, 1]);
+  }
 }
 
 async function uploadToKie(base64Data: string, apiKey: string): Promise<string> {
@@ -187,85 +352,86 @@ async function pollKieTask(apiKey: string, taskId: string): Promise<string> {
   throw new Error("KIE Task timed out");
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const db = getDb();
+  let jobId = 0;
+  let guestCookieValue: string | undefined;
   try {
     const json = await req.json();
+    const action = String(json?.action || "remove");
+    const upscaleOnly = action === "upscale_hd";
     const { imageDataUrl, maskDataUrl, kieMaskDataUrl, scene, resizedForLama } = json;
+    const quality = normalizeQuality(json?.quality);
+    const mode = normalizeEditMode(json?.mode);
+    const isHd = Boolean(json?.hd);
+    let creditCost = upscaleOnly ? 1 : getCreditCost(quality, isHd, false);
 
     if (!imageDataUrl || typeof imageDataUrl !== "string") {
-      return Response.json({ msg: "Invalid image input.", status: 400 });
+      return buildResponse({ msg: "Invalid image input.", status: 400 }, 400);
+    }
+    if (!upscaleOnly && !maskDataUrl && !kieMaskDataUrl) {
+      return buildResponse({ msg: "Mask is required for this model. Please paint over the area to remove.", status: 400 }, 400);
     }
 
-    // Check for KIE API Key first
+    const userContextBase = await resolveUserContext(req);
+    guestCookieValue = userContextBase.guestCookieValue;
+    const subscriptionRes = await db.query("select * from subscriptions where user_id=$1 order by id desc limit 1", [userContextBase.userId]);
+    const subStatus = String(subscriptionRes.rows?.[0]?.status || "");
+    const isSubscribed = subStatus === "active";
+    const creditBalance = await ensureCreditsRow(userContextBase.userId);
+    const usage = await getTodayUsage(userContextBase.userId);
+    const isFreeTier = !isSubscribed && creditBalance <= 0;
+
+    const userContext: UserAccessContext = {
+      userId: userContextBase.userId,
+      isGuest: userContextBase.isGuest,
+      isSubscribed,
+      creditBalance,
+      isFreeTier,
+      todayUsedCount: usage.usedCount,
+      guestCookieValue
+    };
+    creditCost = upscaleOnly ? (userContext.isSubscribed ? 0 : 1) : getCreditCost(quality, isHd, userContext.isSubscribed);
+
+    if (userContext.isFreeTier) {
+      if (upscaleOnly || quality !== "standard" || isHd) {
+        return buildResponse({ msg: "Free users support Standard mode only.", status: 602 }, 200, guestCookieValue);
+      }
+      if (userContext.todayUsedCount >= FREE_DAILY_LIMIT) {
+        return buildResponse({ msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 }, 200, guestCookieValue);
+      }
+    } else if (userContext.creditBalance < creditCost) {
+      return buildResponse({ msg: "Not enough credits. Buy more to continue.", status: 602 }, 200, guestCookieValue);
+    }
+
     const kieApiKey = process.env.KIE_API_KEY;
-    
     const basePrompt = "clean background, natural lighting, seamless background continuation";
     const prompt = basePrompt;
     const negative_prompt = "shadow, dark patch, uneven lighting, artifact, blur, distortion";
     const sdPrompt = basePrompt;
     const sdNegativePrompt = "shadow, dark patch, uneven lighting, artifact, blur, distortion";
 
-    // Force use of Replicate for now as per user request to switch model
-    // if (kieApiKey) {
-    if (false && kieApiKey) { 
-      console.log("Using KIE API for shadow removal");
-      
-      // 1. Upload Image
+    if (false && kieApiKey) {
       const imageUrl = await uploadToKie(imageDataUrl, kieApiKey);
-      
-      // 2. Upload Mask (if exists)
-      // Use KIE-specific mask if available (White=Preserve, Black=Modify)
-      // Otherwise fall back to standard mask (Black=Preserve, White=Modify)
       const maskToUse = kieMaskDataUrl || maskDataUrl;
       let maskUrl = "";
-      
       if (maskToUse) {
-          maskUrl = await uploadToKie(maskToUse, kieApiKey);
+        maskUrl = await uploadToKie(maskToUse, kieApiKey);
       }
-
-      // 3. Generate
-      // Note: If using standard mask, the colors might be inverted for KIE (which expects White=Preserve).
-      // Ideally, the frontend should always provide kieMaskDataUrl.
-      // If only standard mask is present, KIE might modify the wrong area.
-      // But we assume frontend sends kieMaskDataUrl now.
-      
       const outputUrl = await generate4oImage(kieApiKey, imageUrl, maskUrl, prompt, scene);
-      
-      return new Response(JSON.stringify({ output_url: outputUrl }), {
-        headers: { "Content-Type": "application/json" },
-        status: 200
-      });
+      return buildResponse({ output_url: outputUrl }, 200, guestCookieValue);
     }
 
-    // Fallback to Replicate
-    // Use stability-ai/stable-diffusion-inpainting
-    // https://replicate.com/stability-ai/stable-diffusion-inpainting/api
-    // Prefer environment variable, otherwise use default official version
     const model = process.env.REPLICATE_SHADOW_MODEL_RUN || "stability-ai/stable-diffusion-inpainting:95b7223104132402a9ae91cc677285bc5eb997834bd2349fa486f53910fd68b3";
-
     const replicate = getReplicateClient();
-    
-    // Ensure mask is provided for Inpainting
-    if (!maskDataUrl && !kieMaskDataUrl) {
-         return Response.json({ msg: "Mask is required for this model. Please paint over the area to remove.", status: 400 });
-    }
-    
-    // Reverted Mask Logic:
-    // User confirmed that the inverted mask (kieMaskDataUrl) caused the image to be "messed up".
-    // This confirms that the Standard Mask (maskDataUrl: White=Modify, Black=Preserve) was correct all along.
-    // The "partial removal" issue is likely due to prompt or model strength, not mask inversion.
-    
-    const selectedVariant = process.env.REPLICATE_SHADOW_MODEL_VARIANT || "sd_inpaint";
+    const selectedVariant = resolveModelVariant(quality, mode);
     const allowLamaOomFallback = (process.env.REPLICATE_SHADOW_FALLBACK_ON_OOM || "1") !== "0";
-    const lamaMaxSide = Math.max(512, Number(process.env.REPLICATE_SHADOW_LAMA_MAX_SIDE || "1600") || 1600);
+    const lamaMaxSideDefault = Math.max(512, Number(process.env.REPLICATE_SHADOW_LAMA_MAX_SIDE || "1600") || 1600);
+    const lamaMaxSideText = Math.max(512, Number(process.env.REPLICATE_SHADOW_LAMA_MAX_SIDE_TEXT || "2048") || 2048);
+    const lamaMaxSide = mode === "text" ? lamaMaxSideText : lamaMaxSideDefault;
     const maskInput = maskDataUrl || kieMaskDataUrl;
     let modelToRun = model;
     let input: Record<string, any>;
-    const sdxlModel = process.env.REPLICATE_SHADOW_MODEL_RUN_SDXL || "lucataco/sdxl-inpainting";
-    const sdxlScheduler = process.env.REPLICATE_SHADOW_SDXL_SCHEDULER || "K_EULER";
-    const sdxlSteps = Math.max(1, Math.min(80, Number(process.env.REPLICATE_SHADOW_SDXL_STEPS || "20") || 20));
-    const sdxlGuidance = Math.max(0, Math.min(10, Number(process.env.REPLICATE_SHADOW_SDXL_GUIDANCE_SCALE || "8") || 8));
-    const sdxlStrength = Math.max(0.01, Math.min(1, Number(process.env.REPLICATE_SHADOW_SDXL_STRENGTH || "0.75") || 0.75));
     const sdSteps = Math.max(1, Math.min(80, Number(process.env.REPLICATE_SHADOW_SD_STEPS || "30") || 30));
     const sdGuidance = Math.max(0, Math.min(20, Number(process.env.REPLICATE_SHADOW_SD_GUIDANCE_SCALE || "7.5") || 7.5));
     const sdStrength = Math.max(0.01, Math.min(1, Number(process.env.REPLICATE_SHADOW_SD_STRENGTH || "0.78") || 0.78));
@@ -273,42 +439,39 @@ export async function POST(req: Request) {
     const sdPass1Steps = Math.max(1, Math.min(80, Number(process.env.REPLICATE_SHADOW_SD_PASS1_STEPS || "24") || 24));
     const sdPass1Guidance = Math.max(0, Math.min(20, Number(process.env.REPLICATE_SHADOW_SD_PASS1_GUIDANCE_SCALE || "4.8") || 4.8));
     const sdPass1Strength = Math.max(0.01, Math.min(1, Number(process.env.REPLICATE_SHADOW_SD_PASS1_STRENGTH || "0.72") || 0.72));
+    const swinirModel = process.env.REPLICATE_HD_MODEL_RUN_SWINIR || "jingyunliang/swinir:660d922d33153019e8c263a3bba265de882e7f4f70396546b6c9c8f9d47a021a";
+    const swinirJpeg = Number.parseInt(String(process.env.REPLICATE_HD_SWINIR_JPEG ?? "40"), 10);
+    const swinirNoise = Number.parseInt(String(process.env.REPLICATE_HD_SWINIR_NOISE ?? "15"), 10);
+    const swinirJpegInput = Number.isFinite(swinirJpeg) ? swinirJpeg : 40;
+    const swinirNoiseInput = Number.isFinite(swinirNoise) ? swinirNoise : 15;
+    const swinirTaskType = process.env.REPLICATE_HD_SWINIR_TASK_TYPE || "Real-World Image Super-Resolution-Large";
+    const isTextSd = mode === "text" && selectedVariant === "sd_inpaint";
     const sdInput = {
       prompt: sdPrompt,
       negative_prompt: sdNegativePrompt,
       image: imageDataUrl,
       mask: maskInput,
-      num_inference_steps: sdSteps,
-      guidance_scale: sdGuidance,
-      strength: sdStrength
+      num_inference_steps: isTextSd
+        ? Math.max(1, Math.min(80, Number(process.env.REPLICATE_SHADOW_SD_TEXT_STEPS || "34") || 34))
+        : sdSteps,
+      guidance_scale: isTextSd
+        ? Math.max(0, Math.min(20, Number(process.env.REPLICATE_SHADOW_SD_TEXT_GUIDANCE_SCALE || "6.8") || 6.8))
+        : sdGuidance,
+      strength: isTextSd
+        ? Math.max(0.01, Math.min(1, Number(process.env.REPLICATE_SHADOW_SD_TEXT_STRENGTH || "0.84") || 0.84))
+        : sdStrength
     };
 
     if (selectedVariant === "lama") {
       if (!resizedForLama) {
-        return Response.json({
+        return buildResponse({
           need_client_resize: true,
           maxSide: lamaMaxSide,
           status: 200
-        });
+        }, 200, guestCookieValue);
       }
       modelToRun = process.env.REPLICATE_SHADOW_MODEL_RUN_LAMA || "allenhooo/lama";
-      input = {
-        image: imageDataUrl,
-        mask: maskInput
-      };
-    } else if (selectedVariant === "sdxl_inpaint") {
-      modelToRun = sdxlModel;
-      input = {
-        prompt: prompt,
-        negative_prompt: negative_prompt,
-        image: imageDataUrl,
-        mask: maskInput,
-        scheduler: sdxlScheduler,
-        guidance_scale: sdxlGuidance,
-        steps: sdxlSteps,
-        strength: sdxlStrength,
-        num_outputs: 1
-      };
+      input = { image: imageDataUrl, mask: maskInput };
     } else {
       input = sdInput;
     }
@@ -316,7 +479,7 @@ export async function POST(req: Request) {
     if (selectedVariant !== "sd_inpaint" && !modelToRun.includes(":")) {
       const token = process.env.REPLICATE_API_TOKEN;
       if (!token) {
-        return Response.json({ msg: "Missing REPLICATE_API_TOKEN.", status: 500 });
+        return buildResponse({ msg: "Missing REPLICATE_API_TOKEN.", status: 500 }, 500, guestCookieValue);
       }
       try {
         const modelInfoRes = await fetch(`https://api.replicate.com/v1/models/${modelToRun}`, {
@@ -337,7 +500,31 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`Running Replicate model: ${modelToRun}`);
+    const imageWidth = Number(json?.imageWidth || 0);
+    const imageHeight = Number(json?.imageHeight || 0);
+    const imageUrlToStore = imageDataUrl.length > 60000 ? imageDataUrl.slice(0, 60000) : imageDataUrl;
+    const imageInsertRes = await db.query("insert into images(user_id,url,width,height) values($1,$2,$3,$4)", [
+      userContext.userId,
+      imageUrlToStore,
+      imageWidth,
+      imageHeight
+    ]);
+    let imageId = Number(imageInsertRes.insertId || 0);
+    if (!imageId) {
+      const imageRow = await db.query("select id from images where user_id=$1 order by id desc limit 1", [userContext.userId]);
+      imageId = Number(imageRow.rows?.[0]?.id || 0);
+    }
+
+    const jobInsertRes = await db.query(
+      "insert into jobs(user_id,image_id,mode,status,credit_cost,is_hd) values($1,$2,$3,$4,$5,$6)",
+      [userContext.userId, imageId, upscaleOnly ? "standard" : quality, "pending", creditCost, upscaleOnly ? true : isHd]
+    );
+    jobId = Number(jobInsertRes.insertId || 0);
+    if (!jobId) {
+      const jobRow = await db.query("select id from jobs where user_id=$1 order by id desc limit 1", [userContext.userId]);
+      jobId = Number(jobRow.rows?.[0]?.id || 0);
+    }
+
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const isRateLimitError = (errText: string) => {
       return errText.includes("status 429") || errText.includes('"status":429') || errText.includes("Too Many Requests") || errText.includes("throttled");
@@ -346,10 +533,10 @@ export async function POST(req: Request) {
       const retrySec = Number(errText.match(/"retry_after"\s*:\s*(\d+)/)?.[1] || "1");
       return Math.max(1000, retrySec * 1000);
     };
-    const runReplicateWithRetry = async (runInput: Record<string, any>, maxAttempts = 3) => {
+    const runReplicateWithRetry = async (runInput: Record<string, any>, maxAttempts = 3, runModel = modelToRun) => {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
-          return await replicate.run(modelToRun as any, { input: runInput });
+          return await replicate.run(runModel as any, { input: runInput });
         } catch (err) {
           const errText = String(err || "");
           if (!isRateLimitError(errText) || attempt === maxAttempts - 1) {
@@ -361,7 +548,42 @@ export async function POST(req: Request) {
       }
       throw new Error("Replicate retry failed.");
     };
-    
+
+    if (upscaleOnly) {
+      const hdOutput = await runReplicateWithRetry({
+        image: imageDataUrl,
+        jpeg: swinirJpegInput,
+        noise: swinirNoiseInput,
+        task_type: swinirTaskType
+      }, 3, swinirModel);
+      const hdOutputUrl = await resolveOutputUrl(hdOutput);
+      if (!hdOutputUrl) {
+        throw new Error("HD upscale returned empty output.");
+      }
+      await db.query("insert into results(job_id,image_url,resolution) values($1,$2,$3)", [
+        jobId,
+        hdOutputUrl,
+        "hd"
+      ]);
+      await db.query("update jobs set status=$1,updated_at=now() where id=$2", ["success", jobId]);
+      if (creditCost > 0) {
+        await db.query("update credits set balance=balance-$1,updated_at=now() where user_id=$2", [creditCost, userContext.userId]);
+      }
+      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+        userContext.userId,
+        -creditCost,
+        creditCost > 0 ? "consume_hd" : "consume_hd_pro",
+        jobId
+      ]);
+      const creditsAfterRes = await db.query("select balance from credits where user_id=$1 limit 1", [userContext.userId]);
+      const creditsAfter = Number(creditsAfterRes.rows?.[0]?.balance || 0);
+      return buildResponse({
+        output_url: hdOutputUrl,
+        credits_remaining: creditsAfter,
+        free_remaining: 0
+      }, 200, guestCookieValue);
+    }
+
     let output;
     try {
       if (selectedVariant === "sd_inpaint" && sdTwoPass) {
@@ -398,16 +620,13 @@ export async function POST(req: Request) {
       }
     } catch (runErr) {
       const errText = String(runErr || "");
-      const isLamaOom = selectedVariant === "lama" && (
-        errText.includes("CUDA out of memory") ||
-        errText.includes("out of memory")
-      );
+      const isLamaOom = selectedVariant === "lama" && (errText.includes("CUDA out of memory") || errText.includes("out of memory"));
       if (selectedVariant === "lama" && String(runErr).includes("could not be found") && !modelToRun.includes(":")) {
-        return Response.json({
+        return buildResponse({
           msg: "LaMa model slug not found. Set REPLICATE_SHADOW_MODEL_RUN_LAMA to a versioned id like owner/model:version.",
           error: String(runErr),
           status: 500
-        });
+        }, 500, guestCookieValue);
       }
       if (isLamaOom && allowLamaOomFallback) {
         output = await runReplicateWithRetry(sdInput);
@@ -415,19 +634,94 @@ export async function POST(req: Request) {
         throw runErr;
       }
     }
-    // Stable Diffusion Inpainting usually returns an array of image URLs
-    const outputUrl = Array.isArray(output) ? output[0] : output;
 
+    const outputUrl = await resolveOutputUrl(output);
     if (!outputUrl) {
-      return Response.json({ msg: "Model returned empty output.", status: 500 });
+      throw new Error("Model returned empty output.");
+    }
+    let finalOutputUrl = outputUrl;
+    if (quality === "high_quality") {
+      const swinirOut = await runReplicateWithRetry(
+        {
+          image: outputUrl,
+          jpeg: swinirJpegInput,
+          noise: swinirNoiseInput,
+          task_type: swinirTaskType
+        },
+        3,
+        swinirModel
+      );
+      const enhancedUrl = await resolveOutputUrl(swinirOut);
+      if (!enhancedUrl) {
+        throw new Error("High quality enhance (SwinIR) returned empty output.");
+      }
+      finalOutputUrl = enhancedUrl;
     }
 
-    return new Response(JSON.stringify({ output_url: outputUrl }), {
-      headers: { "Content-Type": "application/json" },
-      status: 200
-    });
+    await db.query("insert into results(job_id,image_url,resolution) values($1,$2,$3)", [
+      jobId,
+      finalOutputUrl,
+      isHd || quality === "high_quality" ? "hd" : "standard"
+    ]);
+    await db.query("update jobs set status=$1,updated_at=now() where id=$2", ["success", jobId]);
+
+    if (userContext.isFreeTier) {
+      await increaseTodayUsage(userContext.userId);
+      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+        userContext.userId,
+        0,
+        "free_daily",
+        jobId
+      ]);
+      const usageAfter = await getTodayUsage(userContext.userId);
+      return buildResponse({
+        output_url: finalOutputUrl,
+        credits_remaining: 0,
+        free_remaining: Math.max(0, FREE_DAILY_LIMIT - usageAfter.usedCount)
+      }, 200, guestCookieValue);
+    }
+
+    await db.query("update credits set balance=balance-$1,updated_at=now() where user_id=$2", [creditCost, userContext.userId]);
+    if (quality === "high_quality") {
+      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+        userContext.userId,
+        -creditCost,
+        "consume_pro",
+        jobId
+      ]);
+    } else {
+      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+        userContext.userId,
+        -1,
+        "consume_standard",
+        jobId
+      ]);
+      if (isHd) {
+        await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+          userContext.userId,
+          -1,
+          "consume_hd",
+          jobId
+        ]);
+      }
+    }
+
+    const creditsAfterRes = await db.query("select balance from credits where user_id=$1 limit 1", [userContext.userId]);
+    const creditsAfter = Number(creditsAfterRes.rows?.[0]?.balance || 0);
+    return buildResponse({
+      output_url: finalOutputUrl,
+      credits_remaining: creditsAfter,
+      free_remaining: 0
+    }, 200, guestCookieValue);
   } catch (err) {
+    if (jobId > 0) {
+      try {
+        await db.query("update jobs set status=$1,updated_at=now() where id=$2", ["failed", jobId]);
+      } catch (updateErr) {
+        console.error("Failed to update job status:", updateErr);
+      }
+    }
     console.error("AI refine failed:", err);
-    return Response.json({ msg: "AI refine failed.", error: String(err), status: 500 });
+    return buildResponse({ msg: "AI refine failed.", error: String(err), status: 500 }, 500, guestCookieValue);
   }
 }

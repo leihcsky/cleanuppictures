@@ -3,6 +3,34 @@
 import { useRef, type ChangeEvent } from "react";
 import { ArrowUpOnSquareIcon } from "@heroicons/react/24/outline";
 
+const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
+const UPLOAD_STORE_NAME = 'pending_uploads';
+
+const openUploadDb = () =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open(UPLOAD_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(UPLOAD_STORE_NAME)) {
+        db.createObjectStore(UPLOAD_STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+const saveUploadBlob = async (key: string, blob: Blob) => {
+  const db = await openUploadDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(UPLOAD_STORE_NAME, 'readwrite');
+    tx.objectStore(UPLOAD_STORE_NAME).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+};
+
 export default function UploadRedirectCard({ locale }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const sampleUrls = [
@@ -21,22 +49,30 @@ export default function UploadRedirectCard({ locale }) {
     fileInputRef.current.click();
   };
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      if (!dataUrl) return;
-      sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({ type: 'data', value: dataUrl }));
+    try {
+      const token = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await saveUploadBlob(token, file);
+      sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({
+        type: 'idb',
+        value: token,
+        name: file.name || 'upload',
+        mime: file.type || 'image/png'
+      }));
       gotoHome();
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.error('Failed to persist upload before redirect:', e);
+      alert('Upload is too large for temporary storage. Please use the tool page directly to upload this image.');
+    }
   };
 
   const onInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) handleFile(file);
+    if (file) {
+      void handleFile(file);
+    }
   };
 
   const loadSample = (url: string) => {

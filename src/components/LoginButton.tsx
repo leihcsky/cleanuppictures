@@ -41,6 +41,7 @@ const LoginButton = ({
   async function logout() {
     setShowLogoutModal(true);
   }
+  const avatarText = (userData?.name || userData?.email || 'U').slice(0, 1).toUpperCase();
 
   return (
     <>
@@ -77,7 +78,13 @@ const LoginButton = ({
                 className={`inline-flex justify-center gap-x-1.5 rounded-md text-sm font-semibold ${className}`}
                 onClick={logout}
               >
-                <img className="h-8 w-auto rounded-full" src={userData.image} alt=""/>
+                {userData?.image ? (
+                  <img className="h-8 w-8 rounded-full object-cover" src={userData.image} alt={userData?.name || 'user'} />
+                ) : (
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">
+                    {avatarText}
+                  </span>
+                )}
               </button>
             }
           </>

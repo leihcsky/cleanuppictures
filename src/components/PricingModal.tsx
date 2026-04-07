@@ -42,6 +42,7 @@ export default function PricingModal({
               <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl">
                 <Pricing
                   redirectUrl={redirectUrl}
+                  locale={locale}
                 />
               </Dialog.Panel>
             </Transition.Child>

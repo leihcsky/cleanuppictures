@@ -1,7 +1,9 @@
 import {getStripe} from '~/libs/stripeClient';
 import React, {useState} from 'react';
 import {useCommonContext} from "~/context/common-context";
-import {priceList} from "~/configs/stripeConfig";
+import Link from "next/link";
+import { getLinkHref } from "~/configs/buildLink";
+import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/billingPolicy";
 
 const CheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -11,16 +13,19 @@ const CheckIcon = ({ className }: { className?: string }) => (
 
 export default function Pricing({
                                   redirectUrl,
-                                  isPricing = false
+                                  isPricing = false,
+                                  locale = 'en'
                                 }) {
   const [priceIdLoading, setPriceIdLoading] = useState<string>();
-  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  const monthlySubscription = getMonthlySubscriptionOffer(locale);
+  const creditPackOffers = getCreditPackOffers(locale);
   
   const {
     setShowLoginModal,
     userData,
     pricingText
   } = useCommonContext();
+  const isZh = locale === 'zh';
 
   const handleCheckout = async (priceId: string, type: 'recurring' | 'one_time') => {
     setPriceIdLoading(priceId);
@@ -62,62 +67,135 @@ export default function Pricing({
 
   const plans = [
     {
+      kind: 'free',
       id: 'free',
       title: pricingText.freeTitle,
       price: pricingText.freePrice,
       period: '',
-      description: pricingText.freeCredits,
+      description: isZh ? '仅体验 Standard，适合轻度试用。' : 'Standard-only experience for quick trials.',
       features: [
-        pricingText.freeFeature1,
-        pricingText.freeFeature2,
-        pricingText.freeFeature3,
-        pricingText.freeFeature4,
+        isZh ? '每日 3 次免费 Standard 处理' : '3 free Standard edits per day',
+        isZh ? '仅支持 Standard cleanup' : 'Standard cleanup only',
+        isZh ? '不包含高质量模式' : 'No High Quality mode',
+        isZh ? '输出分辨率有限' : 'Limited output resolution',
       ],
       buttonText: pricingText.freeBtn,
       buttonAction: () => window.location.href = '/',
       isPopular: false,
     },
     {
-      id: period === 'monthly' ? 'price_starter_monthly' : 'price_starter_yearly',
-      title: pricingText.starterTitle,
-      price: period === 'monthly' ? pricingText.starterPriceMonth : pricingText.starterPriceYear,
-      period: pricingText.perMonth,
-      description: pricingText.starterCredits,
+      kind: 'paygo',
+      id: 'paygo',
+      title: pricingText.payGoTitle,
+      price: locale === 'zh' ? `低至 ${creditPackOffers[0]?.priceDisplay || '$5'}` : `From ${creditPackOffers[0]?.priceDisplay || '$5'}`,
+      period: '',
+      description: isZh ? '轻度用户按需付费，功能完整。' : 'Full features, pay only when you need them.',
       features: [
-        pricingText.starterFeature1,
-        pricingText.starterFeature2,
-        pricingText.starterFeature3,
-        pricingText.starterFeature4,
-        pricingText.starterFeature5,
+        isZh ? '按使用付费，不浪费预算' : 'Pay only for what you use',
+        isZh ? '标准模式与高质量模式均可使用' : 'Standard and High Quality included',
+        isZh ? 'HD 下载已包含' : 'HD downloads included',
+        isZh ? '额度永久有效' : 'Balance never expires',
       ],
-      buttonText: pricingText.starterBtn,
-      buttonAction: () => handleCheckout(period === 'monthly' ? 'price_starter_monthly' : 'price_starter_yearly', 'recurring'),
-      isPopular: false,
+      buttonText: pricingText.payGoBtn,
+      buttonAction: () => handleCheckout(creditPackOffers[0]?.priceId || 'price_credit_100', 'one_time'),
+      isPopular: true,
     },
     {
-      id: period === 'monthly' ? 'price_pro_monthly' : 'price_pro_yearly',
+      kind: 'pro',
+      id: monthlySubscription.priceId,
       title: pricingText.proTitle,
-      price: period === 'monthly' ? pricingText.proPriceMonth : pricingText.proPriceYear,
+      price: monthlySubscription.priceDisplay,
       period: pricingText.perMonth,
-      description: pricingText.proCredits,
+      description: isZh
+        ? `每月含 ${monthlySubscription.credits} 积分 · 解锁全部能力`
+        : `${monthlySubscription.credits} credits every month · Full access`,
       features: [
-        pricingText.proFeature1,
-        pricingText.proFeature2,
-        pricingText.proFeature3,
-        pricingText.proFeature4,
-        pricingText.proFeature5,
+        isZh ? '包含全部功能' : 'All features included',
+        isZh ? '高质量模式更划算' : 'Better value on High Quality',
+        isZh ? 'HD 下载已包含' : 'HD downloads included',
+        isZh ? '处理更快' : 'Faster processing',
+        isZh ? '优先处理通道' : 'Priority access',
       ],
       buttonText: pricingText.proBtn,
-      buttonAction: () => handleCheckout(period === 'monthly' ? 'price_pro_monthly' : 'price_pro_yearly', 'recurring'),
-      isPopular: true,
+      buttonAction: () => handleCheckout(monthlySubscription.priceId, 'recurring'),
+      isPopular: false,
     },
   ];
 
-  const credits = [
-    { credits: pricingText.payGoOption1, price: pricingText.payGoPrice1, id: 'price_credit_100' },
-    { credits: pricingText.payGoOption2, price: pricingText.payGoPrice2, id: 'price_credit_500' },
-    { credits: pricingText.payGoOption3, price: pricingText.payGoPrice3, id: 'price_credit_1500' },
-  ];
+  const credits = creditPackOffers.map((item) => ({
+    credits: item.creditsLabel,
+    price: item.priceDisplay,
+    id: item.priceId
+  }));
+  const pricingFaqs = locale === 'zh'
+    ? [
+      {
+        q: '免费用户每天可以处理多少次？',
+        a: '免费版每天可进行 3 次标准处理。达到上限后，可购买按量额度或升级 Pro 继续使用。'
+      },
+      {
+        q: '按量购买的额度会过期吗？',
+        a: '不会。按量购买的额度永久有效，可随时用于后续编辑。'
+      },
+      {
+        q: 'Pro 相对按量有什么优势？',
+        a: '按月给到稳定额度，并享有更快队列与优先处理，适合经常使用高质量模式的用户。'
+      },
+      {
+        q: 'Pro 和按量付费，单次处理消耗的积分一样吗？',
+        a: '不完全一样。同等能力下，Pro 往往在高质量、HD 等环节更省积分；按量则按次计价、简单透明。每次具体扣多少以工具页（编辑器）里的实时提示为准。'
+      },
+      {
+        q: '什么时候会计费？',
+        a: '仅在成功生成可用结果后计费；处理失败不收取费用。'
+      },
+      {
+        q: '我可以先订阅 Pro，再额外购买按量额度吗？',
+        a: '可以。若月度用量用尽，仍可按量加购以继续编辑。'
+      },
+      {
+        q: '支持退款吗？',
+        a: '请查看 Refund Policy。若有账单问题，可联系 support@cleanuppictures.org。'
+      },
+      {
+        q: '为什么我看不到某些支付方式？',
+        a: '可用支付方式由 Stripe 和你的地区决定。若当前方式不可用，建议更换卡种或地区后重试。'
+      }
+    ]
+    : [
+      {
+        q: 'How many free edits do I get each day?',
+        a: 'The Free plan includes 3 standard edits per day. After that, you can buy pay-as-you-go balance or upgrade to Pro.'
+      },
+      {
+        q: 'Does pay-as-you-go balance expire?',
+        a: 'No. Purchased balance never expires and stays available for future edits.'
+      },
+      {
+        q: 'What are the advantages of Pro over pay-as-you-go?',
+        a: 'A predictable monthly allowance, faster queueing, and priority processing—great if you use High Quality often.'
+      },
+      {
+        q: 'Do Pro and pay-as-you-go use the same credits per run?',
+        a: 'Not always. For the same capability, Pro is often more credit-efficient on High Quality and HD, while pay-as-you-go is straightforward per-use pricing. The exact amount per run is shown on the tool page.'
+      },
+      {
+        q: 'When am I charged?',
+        a: 'You are charged only after a successful result. Failed runs are not billed.'
+      },
+      {
+        q: 'Can I subscribe to Pro and buy pay-as-you-go add-ons?',
+        a: 'Yes. If you use your monthly allowance, you can top up with pay-as-you-go anytime.'
+      },
+      {
+        q: 'Do you offer refunds?',
+        a: 'Please review our Refund Policy. For billing issues, contact support@cleanuppictures.org.'
+      },
+      {
+        q: 'Why are some payment methods unavailable?',
+        a: 'Available payment methods are determined by Stripe and your region. If one method is unavailable, try another card or payment option.'
+      }
+    ];
 
   return (
     <section className={(isPricing ? "py-24" : "py-12") + " bg-slate-50"}>
@@ -126,40 +204,24 @@ export default function Pricing({
         {/* Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-            {pricingText.h1Text}
+            {isZh ? '更好结果，简单定价' : 'Better results, simple pricing'}
           </h2>
           <p className="mt-4 text-lg leading-8 text-slate-600">
-            {pricingText.description}
+            {isZh
+              ? 'Free、按量与 Pro 三层可选；高质量模式面向更干净、更清晰、更稳定的输出。单次扣费请以工具内提示为准。'
+              : 'Choose Free, pay-as-you-go, or Pro. High Quality mode is for cleaner, sharper, more reliable output. Per-run usage is shown in the tool.'}
+          </p>
+          <p className="mt-4 text-sm text-slate-500">
+            By purchasing, you agree to our{" "}
+            <Link href={getLinkHref(locale, 'terms-of-service')} className="text-blue-700 hover:text-blue-800 underline underline-offset-2">Terms of Service</Link>
+            ,{" "}
+            <Link href={getLinkHref(locale, 'privacy-policy')} className="text-blue-700 hover:text-blue-800 underline underline-offset-2">Privacy Policy</Link>
+            {" "}and{" "}
+            <Link href={getLinkHref(locale, 'refund-policy')} className="text-blue-700 hover:text-blue-800 underline underline-offset-2">Refund Policy</Link>.
           </p>
         </div>
-
-        {/* Toggle */}
-        <div className="flex justify-center mb-12">
-          <div className="relative flex bg-slate-200 rounded-full p-1">
-            <button
-              onClick={() => setPeriod('monthly')}
-              className={`${
-                period === 'monthly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
-              } relative rounded-full py-2 px-6 text-sm font-semibold whitespace-nowrap focus:outline-none transition-all duration-200`}
-            >
-              {pricingText.monthly}
-            </button>
-            <button
-              onClick={() => setPeriod('yearly')}
-              className={`${
-                period === 'yearly' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
-              } relative rounded-full py-2 px-6 text-sm font-semibold whitespace-nowrap focus:outline-none transition-all duration-200`}
-            >
-              {pricingText.yearly}
-              <span className="absolute -top-3 -right-3 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-                {pricingText.saveText}
-              </span>
-            </button>
-          </div>
-        </div>
-
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 mb-20">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 mb-12">
           {plans.map((plan, index) => (
             <div
               key={index}
@@ -181,10 +243,7 @@ export default function Pricing({
                     <span className="text-sm font-semibold leading-6 text-slate-600 ml-1">{plan.period}</span>
                   )}
                 </div>
-                {period === 'yearly' && plan.price !== '$0' && (
-                  <p className="mt-1 text-sm text-slate-500">{pricingText.billedYearly}</p>
-                )}
-                 {period === 'monthly' && plan.price !== '$0' && (
+                {plan.kind === 'pro' && (
                   <p className="mt-1 text-sm text-slate-500">{pricingText.billedMonthly}</p>
                 )}
                 <p className="mt-4 text-sm font-medium text-blue-600">{plan.description}</p>
@@ -198,81 +257,114 @@ export default function Pricing({
                   </li>
                 ))}
               </ul>
+              {plan.kind === 'paygo' && (
+                <div className="mb-6 space-y-2">
+                  {credits.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{item.credits}</p>
+                        <p className="text-xs text-slate-500">{item.price}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCheckout(item.id, 'one_time')}
+                        disabled={!!priceIdLoading}
+                        className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-300 hover:bg-blue-50 disabled:opacity-70"
+                      >
+                        {priceIdLoading === item.id ? '...' : (locale === 'zh' ? '购买' : 'Buy')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              <button
-                onClick={plan.buttonAction}
-                disabled={!!priceIdLoading}
-                className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                  plan.isPopular
-                    ? 'bg-blue-600 text-white hover:bg-blue-500 focus-visible:outline-blue-600'
-                    : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900'
-                } ${priceIdLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                {priceIdLoading === plan.id ? 'Processing...' : plan.buttonText}
-              </button>
+              {plan.kind !== 'paygo' && (
+                <button
+                  onClick={plan.buttonAction}
+                  disabled={!!priceIdLoading}
+                  className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                    plan.isPopular
+                      ? 'bg-blue-600 text-white hover:bg-blue-500 focus-visible:outline-blue-600'
+                      : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900'
+                  } ${priceIdLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {priceIdLoading === plan.id ? 'Processing...' : plan.buttonText}
+                </button>
+              )}
             </div>
           ))}
         </div>
+        <div className="mb-12 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
+          <h3 className="text-lg font-semibold text-slate-900">
+            {isZh ? 'Why upgrade to Pro？' : 'Why upgrade to Pro?'}
+          </h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            <li>{isZh ? '高质量输出更干净、更清晰' : 'High Quality output is cleaner and sharper'}</li>
+            <li>{isZh ? '复杂图片更容易处理成功' : 'Handle difficult images with more confidence'}</li>
+            <li>{isZh ? '高级能力（如高质量模式）更划算' : 'Better deal on premium modes like High Quality'}</li>
+            <li>{isZh ? '更快处理与优先通道' : 'Faster processing and priority access'}</li>
+          </ul>
+        </div>
 
-        {/* Pay As You Go & Credits Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          
-          {/* Pay As You Go */}
-          <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-            <h3 className="text-2xl font-bold text-slate-900 mb-2">{pricingText.payGoTitle}</h3>
-            <p className="text-slate-600 mb-8">{pricingText.payGoDesc}</p>
-            
-            <div className="space-y-4">
-              {credits.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 rounded-lg border border-slate-100 bg-slate-50 hover:border-blue-200 transition-colors">
-                  <span className="font-semibold text-slate-900">{item.credits}</span>
-                  <div className="flex items-center gap-4">
-                    <span className="text-xl font-bold text-slate-900">{item.price}</span>
-                    <button
-                      onClick={() => handleCheckout(item.id, 'one_time')}
-                      disabled={!!priceIdLoading}
-                      className="rounded-md bg-white px-4 py-2 text-sm font-semibold text-blue-600 shadow-sm ring-1 ring-inset ring-blue-300 hover:bg-blue-50 disabled:opacity-70"
-                    >
-                       {priceIdLoading === item.id ? '...' : pricingText.payGoBtn}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+        <div className="mb-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-2xl font-bold text-slate-900">{isZh ? '标准 vs 高质量' : 'Standard vs High Quality'}</h3>
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="py-3 pr-4 text-left font-semibold text-slate-600">{isZh ? '维度' : 'Dimension'}</th>
+                  <th className="py-3 px-4 text-center font-semibold text-slate-600">{isZh ? '标准' : 'Standard'}</th>
+                  <th className="py-3 pl-4 text-center font-semibold text-slate-900">{isZh ? '高质量' : 'High Quality'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 text-slate-700">{isZh ? '适用计划' : 'Available in'}</td>
+                  <td className="py-3 px-4 text-center text-slate-700">{isZh ? 'Free / 按量 / Pro' : 'Free / Pay-Go / Pro'}</td>
+                  <td className="py-3 pl-4 text-center text-slate-700">{isZh ? '按量 / Pro' : 'Pay-Go / Pro'}</td>
+                </tr>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 text-slate-700">{isZh ? '结果质量' : 'Output quality'}</td>
+                  <td className="py-3 px-4 text-center text-slate-700">{isZh ? '基础清理' : 'Base cleanup'}</td>
+                  <td className="py-3 pl-4 text-center text-emerald-600">{isZh ? '更干净、更清晰' : 'Cleaner and sharper'}</td>
+                </tr>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 text-slate-700">{isZh ? 'HD 下载' : 'HD download'}</td>
+                  <td className="py-3 px-4 text-center text-slate-700">{isZh ? '按规则可用' : 'Available by plan rules'}</td>
+                  <td className="py-3 pl-4 text-center text-emerald-600">{isZh ? '包含或更省' : 'Included or more efficient'}</td>
+                </tr>
+                <tr>
+                  <td className="py-3 pr-4 text-slate-700">{isZh ? '升级价值' : 'Upgrade value'}</td>
+                  <td className="py-3 px-4 text-center text-slate-700">{isZh ? '满足基础需求' : 'Good for baseline tasks'}</td>
+                  <td className="py-3 pl-4 text-center text-emerald-600">{isZh ? '更稳定拿到高质量结果' : 'Higher quality, more consistently'}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-
-          {/* How Credits Work */}
-          <div className="rounded-2xl bg-slate-900 p-8 shadow-sm text-white">
-            <h3 className="text-2xl font-bold mb-6">{pricingText.creditExplTitle}</h3>
-            <p className="text-slate-300 mb-8">{pricingText.creditExplDesc}</p>
-            
-            <ul className="space-y-6">
-              <li className="flex gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                  <span className="text-xl">🖼️</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold">{pricingText.creditExpl1}</h4>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                  <span className="text-xl">✨</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold">{pricingText.creditExpl2}</h4>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                  <span className="text-xl">🔄</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold">{pricingText.creditExpl3}</h4>
-                </div>
-              </li>
-            </ul>
+        </div>
+        <div className="mt-12 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex items-end justify-between gap-4">
+            <h3 className="text-2xl font-bold text-slate-900">{locale === 'zh' ? '常见问题（Billing FAQ）' : 'Frequently Asked Billing Questions'}</h3>
+            <p className="text-xs text-slate-500">{locale === 'zh' ? '覆盖下单前最常见问题' : 'Answers to the most common pre-purchase questions'}</p>
           </div>
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {pricingFaqs.map((item, idx) => (
+              <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <p className="text-sm font-semibold text-slate-900">{item.q}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-10 text-center">
+          <p className="text-xs text-slate-500">
+            Need help with billing? Contact{" "}
+            <a href="mailto:support@cleanuppictures.org" className="text-blue-700 hover:text-blue-800 underline underline-offset-2">
+              support@cleanuppictures.org
+            </a>
+          </p>
         </div>
 
       </div>

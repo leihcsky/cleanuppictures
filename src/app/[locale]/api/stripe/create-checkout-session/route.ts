@@ -12,7 +12,7 @@ export async function POST(req: Request) {
 
     try {
       // 2. select user
-      const userInfoRes = await db.query('select * from user_info where user_id = $1', [user_id]);
+      const userInfoRes = await db.query('select * from users where id = $1 limit 1', [Number(user_id)]);
       const userInfoRow = userInfoRes.rows;
       if (userInfoRow.length <= 0) {
         return new Response(JSON.stringify({message: 'Not have user'}), {

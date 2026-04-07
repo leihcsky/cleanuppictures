@@ -76,6 +76,11 @@ export default function Footer({
                       {menuText.footerLegal1}
                     </Link>
                   </li>
+                  <li>
+                    <Link href={getLinkHref(locale, 'refund-policy')} onClick={() => checkPageAndLoading('refund-policy')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
+                      {locale === 'zh' ? '退款政策' : 'Refund Policy'}
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

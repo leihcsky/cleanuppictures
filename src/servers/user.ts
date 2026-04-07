@@ -1,56 +1,78 @@
-import {v4 as uuidv4} from 'uuid';
 import {getDb} from "~/libs/db";
 
 export const checkAndSaveUser = async (name: string, email: string, image: string, last_login_ip: string) => {
   const db = getDb();
-  const results = await db.query(`select * from user_info where email=$1;`, [email]);
+  const safeEmail = (email || '').trim();
+  const safeName = (name || '').trim();
+  const safeImage = (image || '').trim();
+  const safeIp = (last_login_ip || '').split(',')[0].trim();
+
+  const results = await db.query(`select * from users where email=$1 limit 1;`, [safeEmail]);
   const users = results.rows;
+
   if (users.length <= 0) {
-    const result = {
-      user_id: '',
-      name: '',
-      email: '',
-      image: '',
+    await db.query(
+      'insert into users(email,password_hash,user_name,user_image,is_guest,last_login_ip) values($1,$2,$3,$4,$5,$6)',
+      [safeEmail, '', safeName, safeImage, false, safeIp]
+    );
+
+    const inserted = await db.query('select * from users where email=$1 limit 1', [safeEmail]);
+    const insertedUser = inserted.rows[0];
+    if (!insertedUser) {
+      return {
+        user_id: '',
+        name: '',
+        email: safeEmail,
+        image: '',
+        status: 0
+      };
     }
-    // 新增
-    const strUUID = uuidv4();
-    await db.query('insert into user_info(user_id,name,email,image,last_login_ip) values($1,$2,$3,$4,$5)',
-      [strUUID, name, email, image, last_login_ip]);
 
-    // 免费生成次数
-    const freeTimes = Number(process.env.FREE_TIMES);
-    await db.query('insert into user_available(user_id,stripe_customer_id,available_times) values($1, $2, $3)', [strUUID, '', freeTimes]);
-
-    result.user_id = strUUID;
-    result.name = name;
-    result.email = email;
-    result.image = image;
-    return result;
+    const creditsResult = await db.query('select * from credits where user_id=$1 limit 1', [insertedUser.id]);
+    if (creditsResult.rows.length <= 0) {
+      await db.query('insert into credits(user_id,balance) values($1,$2)', [insertedUser.id, 0]);
+    }
+    return {
+      user_id: String(insertedUser.id),
+      name: insertedUser.user_name || '',
+      email: insertedUser.email || safeEmail,
+      image: insertedUser.user_image || '',
+      status: 1
+    };
   } else {
-    // 更新
     const user = users[0];
-    await db.query('update user_info set name=$1,image=$2,last_login_ip=$3,updated_at=now() where id=$4',
-      [name, image, last_login_ip, user.id]);
-    return user;
+    await db.query('update users set user_name=$1,user_image=$2,last_login_ip=$3 where id=$4',
+      [safeName, safeImage, safeIp, user.id]);
+    const creditsResult = await db.query('select * from credits where user_id=$1 limit 1', [user.id]);
+    if (creditsResult.rows.length <= 0) {
+      await db.query('insert into credits(user_id,balance) values($1,$2)', [user.id, 0]);
+    }
+    return {
+      user_id: String(user.id),
+      name: safeName || user.user_name || '',
+      email: user.email || safeEmail,
+      image: safeImage || user.user_image || '',
+      status: 1
+    };
   }
 }
 
 export const getUserById = async (user_id) => {
   const db = getDb();
-  const results = await db.query('select * from user_info where user_id=$1', [user_id]);
+  const results = await db.query('select * from users where id=$1 limit 1', [Number(user_id)]);
   const users = results.rows;
   if (users.length > 0) {
     const user = users[0];
     return {
-      user_id: user_id,
-      name: user.name,
+      user_id: String(user.id),
+      name: user.user_name || '',
       email: user.email,
-      image: user.image,
+      image: user.user_image || '',
       status: 1
     }
   }
   return {
-    user_id: user_id,
+    user_id: String(user_id || ''),
     name: '',
     email: '',
     image: '',
@@ -60,15 +82,15 @@ export const getUserById = async (user_id) => {
 
 export const getUserByEmail = async (email) => {
   const db = getDb();
-  const results = await db.query('select * from user_info where email=$1', [email]);
+  const results = await db.query('select * from users where email=$1 limit 1', [email]);
   const users = results.rows;
   if (users.length > 0) {
     const user = users[0];
     return {
-      user_id: user.user_id,
-      name: user.name,
+      user_id: String(user.id),
+      name: user.user_name || '',
       email: email,
-      image: user.image,
+      image: user.user_image || '',
       status: 1
     }
   }

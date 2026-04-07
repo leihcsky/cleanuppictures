@@ -52,6 +52,7 @@ const PageComponent = ({
         <Pricing
           redirectUrl={`${locale}/pricing`}
           isPricing={true}
+          locale={locale}
         />
       </div>
       <Footer

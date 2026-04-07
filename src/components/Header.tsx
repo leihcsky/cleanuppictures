@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Dialog } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon, EnvelopeIcon, TagIcon, UserCircleIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
@@ -24,6 +24,7 @@ export default function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const {
     setShowLoadingModal,
+    setShowLogoutModal,
     userData,
     commonText,
     authText,
@@ -32,6 +33,37 @@ export default function Header({
   const pathname = usePathname();
 
   const [pageResult] = useState(getLinkHref(locale, page))
+  const isLoggedIn = Boolean(userData && userData.email);
+  const [overview, setOverview] = useState<any>({
+    credits_balance: 0,
+    subscription_status: '',
+    plan: ''
+  });
+
+  useEffect(() => {
+    const fetchOverview = async () => {
+      if (!userData?.user_id) {
+        setOverview({
+          credits_balance: 0,
+          subscription_status: '',
+          plan: ''
+        });
+        return;
+      }
+      try {
+        const response = await fetch(`/api/user/getSubscriptionOverview?userId=${userData.user_id}`);
+        const json = await response.json();
+        setOverview(json || {});
+      } catch (e) {
+        setOverview({
+          credits_balance: 0,
+          subscription_status: '',
+          plan: ''
+        });
+      }
+    };
+    fetchOverview();
+  }, [userData?.user_id]);
 
   const checkLocalAndLoading = (lang) => {
     setMobileMenuOpen(false);
@@ -162,11 +194,93 @@ export default function Header({
           </Menu>
           
           {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
-            <LoginButton
-              buttonType={userData ? 1 : 0}
-              loginText={authText?.loginText || 'Login'}
-              className={userData ? "" : "border border-white/50 bg-white/50 rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm"}
-            />
+            isLoggedIn ? (
+              <Menu as="div" className="relative inline-block text-left z-30">
+                <Menu.Button className="inline-flex items-center rounded-full border border-white/50 bg-white/60 p-1 shadow-sm hover:bg-white transition-all">
+                  {userData?.image ? (
+                    <img className="h-8 w-8 rounded-full object-cover" src={userData.image} alt={userData?.name || 'user'} />
+                  ) : (
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">
+                      {(userData?.name || userData?.email || 'U').slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </Menu.Button>
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-100"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-75"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute right-0 mt-2 w-80 origin-top-right rounded-2xl bg-white/95 p-2 shadow-xl ring-1 ring-slate-200 focus:outline-none backdrop-blur-md">
+                    <div className="rounded-xl px-3 py-3">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <EnvelopeIcon className="w-4 h-4 text-slate-500" />
+                        <p className="text-sm font-medium truncate">{userData?.email || ''}</p>
+                      </div>
+                    </div>
+                    <div className="my-1 h-px bg-slate-200" />
+                    <div className="px-2 py-2 space-y-2">
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <CurrencyDollarIcon className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm">Credits</span>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-900">{Number(overview?.credits_balance || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="flex items-center gap-2 text-slate-700">
+                          <UserCircleIcon className="w-4 h-4 text-sky-500" />
+                          <span className="text-sm">Subscription</span>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-900">{overview?.subscription_status || 'free'}</span>
+                      </div>
+                    </div>
+                    <div className="my-1 h-px bg-slate-200" />
+                    <div className="px-2 py-2">
+                      <Menu.Item>
+                        <Link
+                          href={getLinkHref(locale, 'pricing')}
+                          onClick={() => checkPageAndLoading('pricing')}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-700 hover:bg-primary-50 hover:text-primary-700"
+                        >
+                          <TagIcon className="w-4 h-4" />
+                          <span className="text-sm font-medium">Pricing</span>
+                        </Link>
+                      </Menu.Item>
+                      <Menu.Item>
+                        <Link
+                          href={getLinkHref(locale, 'my')}
+                          onClick={() => checkPageAndLoading('my')}
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-slate-700 hover:bg-primary-50 hover:text-primary-700"
+                        >
+                          <UserCircleIcon className="w-4 h-4" />
+                          <span className="text-sm font-medium">Manage Subscribe</span>
+                        </Link>
+                      </Menu.Item>
+                    </div>
+                    <div className="my-1 h-px bg-slate-200" />
+                    <div className="px-2 py-2">
+                      <button
+                        onClick={() => setShowLogoutModal(true)}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50"
+                      >
+                        <ArrowLeftStartOnRectangleIcon className="w-4 h-4" />
+                        <span className="text-sm font-medium">Sign Out</span>
+                      </button>
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+            ) : (
+              <LoginButton
+                buttonType={0}
+                loginText={authText?.loginText || 'Login'}
+                className={"border border-white/50 bg-white/50 rounded-lg px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white transition-all shadow-sm"}
+              />
+            )
           )}
         </div>
       </nav>
@@ -226,9 +340,9 @@ export default function Header({
                 {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
                   <div className="pt-4 mt-4 border-t border-gray-100">
                     <LoginButton
-                      buttonType={userData ? 1 : 0}
+                      buttonType={isLoggedIn ? 1 : 0}
                       loginText={authText?.loginText || 'Login'}
-                      className={userData ? "justify-start" : "-mx-3 flex w-full justify-start rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors"}
+                      className={isLoggedIn ? "justify-start" : "-mx-3 flex w-full justify-start rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors"}
                     />
                   </div>
                 )}

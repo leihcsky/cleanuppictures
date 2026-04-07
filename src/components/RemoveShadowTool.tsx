@@ -2,17 +2,77 @@
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { useCommonContext } from "~/context/common-context";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Script from "next/script";
 import Link from "next/link";
-import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon, ArrowUpIcon } from "@heroicons/react/24/outline";
+import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon, ArrowUpIcon, ExclamationTriangleIcon, CreditCardIcon, ShoppingBagIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
-import { Menu, Transition } from "@headlessui/react";
+import { Dialog, Menu, Transition } from "@headlessui/react";
 import ComparisonSlider from "./ComparisonSlider";
 import { getLinkHref } from "~/configs/buildLink";
+import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/billingPolicy";
+import { getStripe } from "~/libs/stripeClient";
 
 const clamp = (v:number, min:number, max:number) => Math.min(max, Math.max(min, v));
+const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
+const UPLOAD_STORE_NAME = 'pending_uploads';
+
+const openUploadDb = () =>
+  new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open(UPLOAD_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(UPLOAD_STORE_NAME)) {
+        db.createObjectStore(UPLOAD_STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+const readUploadBlob = async (key: string): Promise<Blob | null> => {
+  const db = await openUploadDb();
+  const value = await new Promise<Blob | null>((resolve, reject) => {
+    const tx = db.transaction(UPLOAD_STORE_NAME, 'readonly');
+    const req = tx.objectStore(UPLOAD_STORE_NAME).get(key);
+    req.onsuccess = () => resolve((req.result as Blob) || null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return value;
+};
+
+const deleteUploadBlob = async (key: string) => {
+  const db = await openUploadDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(UPLOAD_STORE_NAME, 'readwrite');
+    tx.objectStore(UPLOAD_STORE_NAME).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  db.close();
+};
+
+type BillingSegment = "visitor" | "free" | "credits" | "pro";
+
+function resolveBillingSegment(loggedIn: boolean, subscriptionStatus: string, creditsBalance: number): BillingSegment {
+  if (!loggedIn) return "visitor";
+  if (subscriptionStatus === "active") return "pro";
+  if (creditsBalance > 0) return "credits";
+  return "free";
+}
+
+/** Mirrors remove-shadow API getCreditCost */
+function creditsForRun(quality: "standard" | "high_quality", hd: boolean, isPro: boolean): number {
+  if (quality === "high_quality") return isPro ? 1 : 2;
+  return 1 + (hd ? (isPro ? 0 : 1) : 0);
+}
+
+function isStandardWithoutHd(quality: "standard" | "high_quality", hd: boolean): boolean {
+  return quality === "standard" && !hd;
+}
 
 export default function RemoveShadowTool({
   locale,
@@ -22,7 +82,7 @@ export default function RemoveShadowTool({
   apiPath = "remove-shadow",
   initialMode = "object"
 }) {
-  const { setShowLoadingModal } = useCommonContext();
+  const { setShowLoadingModal, setShowLoginModal, userData } = useCommonContext();
   const isHomeTool = !pageName;
   const normalizeMode = (value: string | null | undefined) => {
     const v = String(value || '').toLowerCase();
@@ -38,6 +98,8 @@ export default function RemoveShadowTool({
   const [downloadFormat, setDownloadFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [sceneType, setSceneType] = useState<'general' | 'person' | 'building' | 'portrait' | 'object'>('general');
+  const [qualityMode, setQualityMode] = useState<'standard' | 'high_quality'>('standard');
+  const [hdEnabled, setHdEnabled] = useState(false);
   const [editorMode, setEditorMode] = useState<'shadow' | 'glare' | 'person' | 'text' | 'object'>(normalizeMode(defaultModeFromPage));
   const [aggressive, setAggressive] = useState<boolean>(true);
   const [bias, setBias] = useState<number>(60);
@@ -61,6 +123,15 @@ export default function RemoveShadowTool({
   const [historyStep, setHistoryStep] = useState<number>(-1);
   const [showReference, setShowReference] = useState(true);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [quotaMessage, setQuotaMessage] = useState('');
+  const [showUpgradeChoiceModal, setShowUpgradeChoiceModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoMessage, setInfoMessage] = useState('');
+  const [checkoutLoadingId, setCheckoutLoadingId] = useState('');
+  const [processingLabelOverride, setProcessingLabelOverride] = useState('');
+  const [billingOverview, setBillingOverview] = useState<Record<string, unknown> | null>(null);
+  const [billingOverviewLoading, setBillingOverviewLoading] = useState(false);
 
   // Debounce
   const [debouncedStrength, setDebouncedStrength] = useState(strength);
@@ -68,6 +139,14 @@ export default function RemoveShadowTool({
     const mode = normalizeMode(defaultModeFromPage);
     setEditorMode(mode);
   }, [defaultModeFromPage]);
+  useEffect(() => {
+    if (qualityMode === 'high_quality' && hdEnabled) {
+      setHdEnabled(false);
+    }
+  }, [qualityMode, hdEnabled]);
+  useEffect(() => {
+    if (isHomeTool) setHdEnabled(false);
+  }, [isHomeTool]);
   useEffect(() => {
     if (editorMode === 'shadow') {
       setAggressive(true);
@@ -101,6 +180,142 @@ export default function RemoveShadowTool({
     const handler = setTimeout(() => setDebouncedStrength(strength), 100);
     return () => clearTimeout(handler);
   }, [strength]);
+
+  useEffect(() => {
+    if (!userData?.user_id) {
+      setBillingOverview(null);
+      setBillingOverviewLoading(false);
+      return;
+    }
+    setBillingOverviewLoading(true);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/${locale}/api/user/getSubscriptionOverview?userId=${userData.user_id}`);
+        const json = (await res.json()) as Record<string, unknown>;
+        if (!cancelled) {
+          setBillingOverview(json || {});
+          setBillingOverviewLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setBillingOverview({});
+          setBillingOverviewLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userData?.user_id, locale]);
+
+  const loggedIn = Boolean(userData?.user_id);
+  const subStatus = String(billingOverview?.subscription_status ?? "");
+  const isProBilling = subStatus === "active";
+  const creditsBal = Number(billingOverview?.credits_balance ?? 0);
+  const freeRemaining = Number(billingOverview?.free_remaining ?? 0);
+  const billingSegment = resolveBillingSegment(loggedIn, subStatus, creditsBal);
+  /** Home tool: no HD option; dedicated tool pages keep HD. */
+  const hdApplies = !isHomeTool && hdEnabled;
+  const standardFreeRun = isStandardWithoutHd(qualityMode, hdApplies);
+  const needsPaidMode = qualityMode === "high_quality" || hdApplies;
+  const runCreditTotal = creditsForRun(qualityMode, hdApplies, isProBilling);
+
+  const creditEstimateLine = useMemo(() => {
+    if (loggedIn && billingOverviewLoading) {
+      return locale === "zh" ? "正在同步账户计费信息…" : "Syncing billing info…";
+    }
+    if ((billingSegment === "visitor" || billingSegment === "free") && standardFreeRun) {
+      if (billingSegment === "free" && freeRemaining <= 0) {
+        return locale === "zh"
+          ? "今日免费次数已用完；请升级或明日再试。"
+          : "Daily free quota is used up. Upgrade or try again tomorrow.";
+      }
+      if (billingSegment === "free") {
+        return locale === "zh"
+          ? `本次不扣积分（Standard，今日还可免费 ${freeRemaining} 次）`
+          : `No credits for this run (Standard, ${freeRemaining} free left today)`;
+      }
+      return locale === "zh"
+        ? "本次不扣积分：Standard 在每日免费次数内无需积分。"
+        : "No credits for Standard while you are within the daily free limit.";
+    }
+    if ((billingSegment === "visitor" || billingSegment === "free") && needsPaidMode) {
+      return locale === "zh"
+        ? "当前选项需登录并拥有订阅或积分。"
+        : "Sign in with a subscription or credits to use this option.";
+    }
+    if (qualityMode === "high_quality") {
+      return locale === "zh"
+        ? `本次 High Quality 预计 ${runCreditTotal} 积分（${billingSegment === "pro" ? "Pro 价" : billingSegment === "visitor" || billingSegment === "free" ? "需登录并有额度" : "按量价"}）`
+        : `High Quality: ${runCreditTotal} credits (${billingSegment === "pro" ? "Pro rate" : billingSegment === "visitor" || billingSegment === "free" ? "sign in + balance" : "pay-as-you-go"})`;
+    }
+    if (hdApplies) {
+      return locale === "zh"
+        ? `本次合计 ${runCreditTotal} 积分：Standard 1${isProBilling ? "，HD 已含" : " + HD 1"}`
+        : `${runCreditTotal} credits total: 1 Standard${isProBilling ? ", HD included" : " + 1 HD"}`;
+    }
+    return locale === "zh"
+      ? `本次 Standard 预计 ${runCreditTotal} 积分`
+      : `Standard: ${runCreditTotal} credit(s)`;
+  }, [
+    loggedIn,
+    billingOverviewLoading,
+    billingSegment,
+    standardFreeRun,
+    needsPaidMode,
+    qualityMode,
+    hdApplies,
+    freeRemaining,
+    runCreditTotal,
+    isProBilling,
+    locale
+  ]);
+
+  const creditGuideLine = useMemo(() => {
+    const pricingHref = getLinkHref(locale, "pricing");
+    if (loggedIn && billingOverviewLoading) {
+      return {
+        body: locale === "zh" ? "加载完成后将显示与你账户匹配的说明。" : "Details will match your account once loaded.",
+        pricingHref
+      };
+    }
+    let body: string;
+    if (billingSegment === "visitor") {
+      body =
+        locale === "zh"
+          ? isHomeTool
+            ? "游客：仅 Standard 可用每日免费次数；High Quality 需登录并具备订阅或额度。"
+            : "游客：仅 Standard 可用每日免费次数；更多能力请登录后订阅或购积分。"
+          : isHomeTool
+            ? "Guests: Standard uses the daily free quota; High Quality needs sign-in with a subscription or balance."
+            : "Guests: Standard only uses the daily free quota; sign in to subscribe or buy credits.";
+    } else if (billingSegment === "free") {
+      body =
+        locale === "zh"
+          ? isHomeTool
+            ? "免费账户：Standard 享每日免费次数；High Quality 需订阅或额度。"
+            : "免费账户：Standard 享每日免费次数；High Quality 与 HD 需订阅或积分。"
+          : isHomeTool
+            ? "Free account: daily Standard quota; High Quality needs a subscription or balance."
+            : "Free account: daily Standard quota; High Quality and HD need a subscription or credits.";
+    } else if (billingSegment === "credits") {
+      body =
+        locale === "zh"
+          ? "按量账户：费用从积分余额扣除（见上方预计）。"
+          : "Pay-as-you-go: charges deduct from your credit balance (see estimate above).";
+    } else {
+      body =
+        locale === "zh"
+          ? isHomeTool
+            ? "Pro：High Quality 1 积分/次（见上方预计）。"
+            : "Pro：High Quality 1 积分/次；Standard + HD 时 HD 不另扣。"
+          : isHomeTool
+            ? "Pro: High Quality is 1 credit per run (see estimate above)."
+            : "Pro: High Quality is 1 credit per run; with Standard + HD, HD has no extra charge.";
+    }
+    return { body, pricingHref };
+  }, [billingSegment, locale, loggedIn, billingOverviewLoading, isHomeTool]);
 
   const drawImageToCanvases = useCallback((img: HTMLImageElement) => {
     if (!canvasRef.current || !maskCanvasRef.current) return false;
@@ -308,21 +523,39 @@ export default function RemoveShadowTool({
     img.src = source;
   }, []);
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('cleanup_pending_upload');
-      if (!raw) return;
-      const payload = JSON.parse(raw);
-      if (payload?.type === 'data' && typeof payload.value === 'string') {
-        loadImageFromSource(payload.value);
-      } else if (payload?.type === 'url' && typeof payload.value === 'string') {
-        loadImageFromSource(payload.value);
-      } else {
+    const loadPendingUpload = async () => {
+      try {
+        const raw = sessionStorage.getItem('cleanup_pending_upload');
+        if (!raw) return;
+        const payload = JSON.parse(raw);
+        if (payload?.type === 'data' && typeof payload.value === 'string') {
+          loadImageFromSource(payload.value);
+          sessionStorage.removeItem('cleanup_pending_upload');
+          return;
+        }
+        if (payload?.type === 'url' && typeof payload.value === 'string') {
+          loadImageFromSource(payload.value);
+          sessionStorage.removeItem('cleanup_pending_upload');
+          return;
+        }
+        if (payload?.type === 'idb' && typeof payload.value === 'string') {
+          const blob = await readUploadBlob(payload.value);
+          await deleteUploadBlob(payload.value);
+          sessionStorage.removeItem('cleanup_pending_upload');
+          if (!blob) return;
+          const file = new File([blob], String(payload?.name || 'upload'), {
+            type: String(payload?.mime || blob.type || 'image/png')
+          });
+          processFile(file);
+          return;
+        }
+        sessionStorage.removeItem('cleanup_pending_upload');
+      } catch {
         sessionStorage.removeItem('cleanup_pending_upload');
       }
-    } catch {
-      sessionStorage.removeItem('cleanup_pending_upload');
-    }
-  }, [loadImageFromSource]);
+    };
+    void loadPendingUpload();
+  }, [loadImageFromSource, processFile]);
 
   const openFilePicker = useCallback(() => {
     if (!fileInputRef.current) return;
@@ -828,10 +1061,78 @@ export default function RemoveShadowTool({
     link.click();
   };
 
+  const requestRemoveShadow = async (payload: any) => {
+    const response = await fetch(`/${locale}/api/${apiPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await response.json();
+    return { response, json };
+  };
+
   const handleGenerate = async () => {
     if (!originalImage || !canvasRef.current) return;
     // Always use backend AI, even without mask (user requirement)
     await handleAiRefine();
+  };
+
+  const handleDownloadHd = async () => {
+    if (!canvasRef.current) return;
+    try {
+      setIsProcessing(true);
+      setProcessingLabelOverride(locale === 'zh' ? '正在生成HD...' : 'Generating HD...');
+      const payload = {
+        action: 'upscale_hd',
+        imageDataUrl: canvasRef.current.toDataURL('image/png'),
+        imageWidth: canvasRef.current.width,
+        imageHeight: canvasRef.current.height
+      };
+      const { response: res, json } = await requestRemoveShadow(payload);
+      if (!(res.ok && json?.output_url)) {
+        setIsProcessing(false);
+        setProcessingLabelOverride('');
+        if (Number(json?.status) === 601) {
+          setShowLoginModal(true);
+          return;
+        }
+        if (Number(json?.status) === 602) {
+          const tip = json?.msg || (locale === 'zh' ? '积分不足，请购买后继续。' : 'Not enough credits. Please upgrade to continue.');
+          setQuotaMessage(tip);
+          setShowQuotaModal(true);
+          return;
+        }
+        setInfoMessage(json?.msg || (locale === 'zh' ? 'HD 生成失败，请稍后重试。' : 'HD generation failed. Please try again.'));
+        setShowInfoModal(true);
+        return;
+      }
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+          }
+        }
+        setIsProcessing(false);
+        setProcessingLabelOverride('');
+        handleDownload();
+      };
+      img.onerror = () => {
+        setIsProcessing(false);
+        setProcessingLabelOverride('');
+        setInfoMessage(locale === 'zh' ? 'HD 图片加载失败。' : 'Failed to load HD image.');
+        setShowInfoModal(true);
+      };
+      img.src = json.output_url;
+    } catch (e) {
+      setIsProcessing(false);
+      setProcessingLabelOverride('');
+      setInfoMessage(locale === 'zh' ? 'HD 生成失败，请稍后重试。' : 'HD generation failed. Please try again.');
+      setShowInfoModal(true);
+    }
   };
 
   const handleAiRefine = async () => {
@@ -865,11 +1166,13 @@ export default function RemoveShadowTool({
               const w = originalImage.naturalWidth;
               const h = originalImage.naturalHeight;
               
-              const dilationPadding = editorMode === 'shadow' ? 16 : editorMode === 'glare' ? 10 : 4;
+              // Emoji/text overlays usually need a wider context ring than generic objects.
+              const dilationPadding = editorMode === 'shadow' ? 16 : editorMode === 'glare' ? 10 : editorMode === 'text' ? 12 : 4;
               const srcData = currentMaskData.data;
               const maskFlags = new Uint8Array(w * h);
               for (let p = 0, i = 0; p < maskFlags.length; p++, i += 4) {
-                maskFlags[p] = srcData[i + 3] > 0 ? 1 : 0;
+                const on = srcData[i + 3] > 0;
+                maskFlags[p] = on ? 1 : 0;
               }
               const binaryCanvas = document.createElement('canvas');
               binaryCanvas.width = w;
@@ -1016,18 +1319,13 @@ export default function RemoveShadowTool({
       };
     };
 
-    const requestRemoveShadow = async (payload: any) => {
-      const response = await fetch(`/${locale}/api/${apiPath}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const json = await response.json();
-      return { response, json };
-    };
-
     try {
       setIsProcessing(true);
+      setProcessingLabelOverride(
+        qualityMode === 'high_quality'
+          ? (locale === 'zh' ? '正在生成高质量结果...' : 'Generating high quality result...')
+          : modeProcessingLabel
+      );
       
       // Use the current canvas content as source (allows iterative editing)
       let src = canvasRef.current.toDataURL('image/png');
@@ -1058,7 +1356,11 @@ export default function RemoveShadowTool({
         maskDataUrl: standardMaskDataUrl,
         kieMaskDataUrl,
         scene: sceneType,
-        mode: editorMode
+        mode: editorMode,
+        imageWidth: canvasRef.current?.width || 0,
+        imageHeight: canvasRef.current?.height || 0,
+        quality: qualityMode,
+        hd: false
       };
       let { response: res, json } = await requestRemoveShadow(payload);
       if (res.ok && json?.need_client_resize) {
@@ -1092,8 +1394,8 @@ export default function RemoveShadowTool({
                     tempCtx.drawImage(img, 0, 0, w, h);
                     const aiImageData = tempCtx.getImageData(0, 0, w, h);
                     
-                    // 3. Composite if mask exists
-                    // This ensures we ONLY update the masked area, preserving original pixels elsewhere (e.g. faces)
+                    // 3. Composite by mask for ALL modes.
+                    // This ensures we ONLY update the masked area, preserving original pixels elsewhere.
                     if (currentMaskData && currentMaskData.width === w && currentMaskData.height === h) {
                          const outputData = ctx.createImageData(w, h);
                          const baseData = baseImageData.data;
@@ -1103,6 +1405,10 @@ export default function RemoveShadowTool({
                          // 1. Dilation: Expand the mask to cover potential edge artifacts
                          // 2. Feathering: Soften the edge for smooth transition
                          
+                         const strictLocalMode = editorMode === 'text' || editorMode === 'object' || editorMode === 'person';
+                         const composeCoreMask = (strictLocalMode && dilatedMaskFlags && dilatedMaskFlags.length === w * h)
+                           ? dilatedMaskFlags
+                           : null;
                          const maskCanvas = document.createElement('canvas');
                          maskCanvas.width = w;
                          maskCanvas.height = h;
@@ -1115,9 +1421,10 @@ export default function RemoveShadowTool({
                             const solidData = solidMaskImg.data;
                             const srcData = currentMaskData.data;
                             
-                            for (let i = 0; i < srcData.length; i += 4) {
-                                // Threshold: treat any painted pixel (even faint) as part of the mask
-                                if (srcData[i + 3] > 0) { 
+                            for (let i = 0, p = 0; i < srcData.length; i += 4, p++) {
+                                // For text/object/person use the same expanded mask used for backend inference.
+                                const coreOn = composeCoreMask ? composeCoreMask[p] > 0 : srcData[i + 3] > 0;
+                                if (coreOn) {
                                     solidData[i] = 255;     
                                     solidData[i + 1] = 255; 
                                     solidData[i + 2] = 255; 
@@ -1166,7 +1473,9 @@ export default function RemoveShadowTool({
                              // We use the original srcData to be safe.
                              // We want to sample pixels that are far from the mask to get true background color.
                              
-                             if (currentMaskData.data[i + 3] === 0) {
+                             const p = Math.floor(i / 4);
+                             const coreOn = composeCoreMask ? composeCoreMask[p] > 0 : currentMaskData.data[i + 3] > 0;
+                             if (!coreOn) {
                                  diffR += (baseData[i] - aiData[i]);
                                  diffG += (baseData[i + 1] - aiData[i + 1]);
                                  diffB += (baseData[i + 2] - aiData[i + 2]);
@@ -1180,22 +1489,24 @@ export default function RemoveShadowTool({
                              diffB /= pixelCount;
                          }
 
-                         for (let i = 0; i < baseData.length; i += 4) {
-                            const coreAlpha = currentMaskData.data[i + 3] > 0 ? 1 : 0;
+                        for (let i = 0; i < baseData.length; i += 4) {
+                           const p = Math.floor(i / 4);
+                           const coreAlpha = (composeCoreMask ? composeCoreMask[p] > 0 : currentMaskData.data[i + 3] > 0) ? 1 : 0;
                             const featherAlpha = maskData[i + 3] / 255.0;
-                            const edgeAlpha = Math.max(0, featherAlpha - coreAlpha) * 0.25;
+                           const edgeStrength = (editorMode === 'text' || editorMode === 'object' || editorMode === 'person') ? 0.12 : 0.25;
+                           const edgeAlpha = Math.max(0, featherAlpha - coreAlpha) * edgeStrength;
                             const alpha = Math.min(1, coreAlpha + edgeAlpha);
                              
                              // Apply Color Correction to AI pixel
                              // AI_Corrected = AI + Diff (where Diff = Base - AI) -> AI_Corrected approaches Base
-                            const correctionFactor = coreAlpha > 0 ? 0.22 : 1;
+                           const correctionFactor = strictLocalMode ? 0 : (coreAlpha > 0 ? 0.22 : 1);
                             const diffCoreR = coreAlpha > 0 ? Math.max(0, diffR) : diffR;
                             const diffCoreG = coreAlpha > 0 ? Math.max(0, diffG) : diffG;
                             const diffCoreB = coreAlpha > 0 ? Math.max(0, diffB) : diffB;
                             let aiR = Math.min(255, Math.max(0, aiData[i] + diffCoreR * correctionFactor));
                             let aiG = Math.min(255, Math.max(0, aiData[i + 1] + diffCoreG * correctionFactor));
                             let aiB = Math.min(255, Math.max(0, aiData[i + 2] + diffCoreB * correctionFactor));
-                            if (coreAlpha > 0) {
+                           if (!strictLocalMode && coreAlpha > 0) {
                               const baseLum = 0.2126 * baseData[i] + 0.7152 * baseData[i + 1] + 0.0722 * baseData[i + 2];
                               const aiLum = 0.2126 * aiR + 0.7152 * aiG + 0.0722 * aiB;
                               if (aiLum < baseLum) {
@@ -1229,22 +1540,39 @@ export default function RemoveShadowTool({
                 clearMask(false);
             }
             setIsProcessing(false);
+            setProcessingLabelOverride('');
           }
         };
         img.onerror = () => {
            setIsProcessing(false);
-           alert(toolText?.processFailed || 'Processing failed.');
+           setProcessingLabelOverride('');
+           setInfoMessage(toolText?.processFailed || 'Processing failed.');
+           setShowInfoModal(true);
         };
         img.src = json.output_url;
       } else {
         setIsProcessing(false);
+        setProcessingLabelOverride('');
+        if (Number(json?.status) === 601) {
+          setShowLoginModal(true);
+          return;
+        }
+        if (Number(json?.status) === 602) {
+          const tip = json?.msg || (locale === 'zh' ? '免费次数已用完，请购买积分或订阅后继续。' : 'Free quota reached. Please buy credits or subscribe to continue.');
+          setQuotaMessage(tip);
+          setShowQuotaModal(true);
+          return;
+        }
         console.error('AI refine failed:', json.msg);
-        alert(toolText?.processFailed || 'Processing failed.');
+        setInfoMessage(json?.msg || toolText?.processFailed || 'Processing failed.');
+        setShowInfoModal(true);
       }
     } catch (e) {
       setIsProcessing(false);
+      setProcessingLabelOverride('');
       console.error('AI refine exception:', e);
-      alert(toolText?.processFailed || 'Processing failed.');
+      setInfoMessage(toolText?.processFailed || 'Processing failed.');
+      setShowInfoModal(true);
     }
   };
 
@@ -1284,6 +1612,7 @@ export default function RemoveShadowTool({
       }
     }
     setImageSrc(null); setOriginalImage(null);
+    setHdEnabled(false);
     setMaskCanvasData(null);
     setZoom(1); setPanX(0); setPanY(0); setPanMode(false);
     setShowReference(false);
@@ -1359,7 +1688,7 @@ export default function RemoveShadowTool({
   const modeOptions = [
     { value: 'object', label: 'Remove Object' },
     { value: 'person', label: 'Remove Person' },
-    { value: 'text', label: 'Remove Emoji from Photo' },
+    { value: 'text', label: 'Remove Text' },
     { value: 'shadow', label: 'Remove Shadow' }
   ] as const;
   const modeLabel = modeOptions.find((item) => item.value === editorMode)?.label || 'Remove Object';
@@ -1386,9 +1715,184 @@ export default function RemoveShadowTool({
         : editorMode === 'person'
           ? 'Remove people and crowds from backgrounds.'
           : 'General mode for objects and small distractions.';
+  const monthlySubscription = getMonthlySubscriptionOffer(locale);
+  const creditPackOffers = getCreditPackOffers(locale);
+  const checkoutFromUpgrade = async (priceId: string, checkoutType: 'recurring' | 'one_time') => {
+    if (!userData?.user_id) {
+      setShowUpgradeChoiceModal(false);
+      setShowLoginModal(true);
+      return;
+    }
+    setShowUpgradeChoiceModal(false);
+    setCheckoutLoadingId(priceId);
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          price: { id: priceId, type: checkoutType },
+          redirectUrl: typeof window !== 'undefined' ? window.location.pathname : getLinkHref(locale, pageName || ''),
+          user_id: userData.user_id
+        })
+      });
+      const res = await response.json();
+      if (res?.error || !res?.sessionId) {
+        setInfoMessage(res?.error?.message || res?.message || (locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.'));
+        setShowInfoModal(true);
+        return;
+      }
+      const stripe = await getStripe();
+      await stripe?.redirectToCheckout({ sessionId: res.sessionId });
+    } catch (e) {
+      setInfoMessage(locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.');
+      setShowInfoModal(true);
+    } finally {
+      setCheckoutLoadingId('');
+    }
+  };
 
   return (
     <>
+      {showQuotaModal && (
+        <Dialog as="div" className="relative z-[90]" open={showQuotaModal} onClose={setShowQuotaModal}>
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]" />
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Dialog.Panel className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-amber-100 p-2">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <Dialog.Title className="text-lg font-semibold text-slate-900">
+                      {locale === 'zh' ? '免费额度已用完' : 'Free quota reached'}
+                    </Dialog.Title>
+                    <p className="mt-2 text-sm text-slate-600">{quotaMessage || (locale === 'zh' ? '今日免费次数已达上限，请升级后继续。' : 'You have reached the daily free limit. Upgrade to continue.')}</p>
+                  </div>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowQuotaModal(false)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {locale === 'zh' ? '取消' : 'Cancel'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowQuotaModal(false);
+                      setShowUpgradeChoiceModal(true);
+                    }}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+                  >
+                    {locale === 'zh' ? '升级套餐' : 'Upgrade plan'}
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {showUpgradeChoiceModal && (
+        <Dialog as="div" className="relative z-[95]" open={showUpgradeChoiceModal} onClose={setShowUpgradeChoiceModal}>
+          <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px]" />
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Dialog.Panel className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+                <Dialog.Title className="text-lg font-semibold text-slate-900">
+                  {locale === 'zh' ? '升级与购买' : 'Upgrade Options'}
+                </Dialog.Title>
+                <p className="mt-2 text-sm text-slate-600">
+                  {locale === 'zh' ? '选择一个订阅计划或积分包，继续使用去除功能。' : 'Pick a subscription plan or a credit pack to continue editing.'}
+                </p>
+                <div className="mt-4 space-y-3">
+                  <button
+                    onClick={() => {
+                      checkoutFromUpgrade(monthlySubscription.priceId, monthlySubscription.checkoutType);
+                    }}
+                    disabled={Boolean(checkoutLoadingId)}
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-800 hover:bg-slate-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CreditCardIcon className="h-5 w-5 text-primary-600" />
+                      <div>
+                        <p className="text-sm font-semibold">{monthlySubscription.title}</p>
+                        <p className="text-xs text-slate-500">{monthlySubscription.summary}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-primary-600">{checkoutLoadingId === monthlySubscription.priceId ? (locale === 'zh' ? '跳转中...' : 'Redirecting...') : (locale === 'zh' ? '订阅' : 'Subscribe')}</span>
+                  </button>
+                  {creditPackOffers.map((offer) => (
+                    <button
+                      key={offer.priceId}
+                      onClick={() => {
+                        checkoutFromUpgrade(offer.priceId, offer.checkoutType);
+                      }}
+                      disabled={Boolean(checkoutLoadingId)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-800 hover:bg-slate-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ShoppingBagIcon className="h-5 w-5 text-primary-600" />
+                        <div>
+                          <p className="text-sm font-semibold">{offer.title}</p>
+                          <p className="text-xs text-slate-500">{offer.summary}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-primary-600">{checkoutLoadingId === offer.priceId ? (locale === 'zh' ? '跳转中...' : 'Redirecting...') : (locale === 'zh' ? '购买' : 'Buy')}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  {locale === 'zh' ? '说明：订阅适合长期使用；积分包适合一次性或按需使用。' : 'Note: Subscription is best for frequent use; credit packs are best for one-time or occasional use.'}
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href={getLinkHref(locale, 'pricing')}
+                    onClick={() => {
+                      setShowUpgradeChoiceModal(false);
+                      setShowLoadingModal(true);
+                    }}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    {locale === 'zh' ? '查看完整定价页 →' : 'View full pricing page →'}
+                  </Link>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowUpgradeChoiceModal(false)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {locale === 'zh' ? '关闭' : 'Close'}
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      {showInfoModal && (
+        <Dialog as="div" className="relative z-[90]" open={showInfoModal} onClose={setShowInfoModal}>
+          <div className="fixed inset-0 bg-slate-900/35" />
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Dialog.Panel className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+                <Dialog.Title className="text-lg font-semibold text-slate-900">
+                  {locale === 'zh' ? '处理提示' : 'Notice'}
+                </Dialog.Title>
+                <p className="mt-3 text-sm text-slate-600">{infoMessage}</p>
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={() => setShowInfoModal(false)}
+                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
+                  >
+                    {locale === 'zh' ? '我知道了' : 'OK'}
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </div>
+          </div>
+        </Dialog>
+      )}
       {/* Custom Cursor */}
       <div 
         ref={cursorRef}
@@ -1605,10 +2109,20 @@ export default function RemoveShadowTool({
                       </button>
                       <button
                         onClick={handleDownload}
-                        className="inline-flex items-center rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                       >
-                         {toolText.download}
-                       </button>
+                        <ArrowDownTrayIcon className="h-4 w-4" />
+                        Download
+                      </button>
+                      {!isHomeTool && hdEnabled && (
+                        <button
+                          onClick={handleDownloadHd}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-primary-300 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700 hover:bg-primary-100 transition-colors"
+                        >
+                          <ArrowDownTrayIcon className="h-4 w-4" />
+                          HD
+                        </button>
+                      )}
                        <Menu as="div" className="relative inline-block text-left">
                         <Menu.Button className="inline-flex items-center justify-center gap-x-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                            {downloadFormat === 'png' ? 'PNG' : downloadFormat === 'jpeg' ? 'JPG' : 'WebP'}
@@ -1633,7 +2147,7 @@ export default function RemoveShadowTool({
                      </div>
                    </div>
                   <div className="flex-1 relative flex overflow-hidden bg-slate-100" ref={wrapperRef}>
-                    <aside className="hidden lg:flex lg:w-72 xl:w-80 flex-col border-r border-slate-200 bg-white p-4 gap-4">
+                    <aside className="hidden lg:flex lg:w-72 xl:w-80 min-h-0 flex-col gap-4 overflow-y-auto border-r border-slate-200 bg-white p-4">
                       <div>
                         <h3 className="text-sm font-semibold text-slate-900">Mode</h3>
                         <p className="mt-1 text-xs text-slate-500">{modeMaskHint}</p>
@@ -1649,6 +2163,63 @@ export default function RemoveShadowTool({
                           </button>
                         ))}
                       </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{locale === 'zh' ? '质量模式' : 'Quality mode'}</p>
+                          <p className="mt-1 text-xs text-slate-500">{locale === 'zh' ? 'Standard 每次 1 积分；High Quality 每次 2 积分（Pro 为 1）。下方按你的账户显示本次预计。' : 'Standard: 1 credit per run. High Quality: 2 credits (1 for Pro). Your estimate below reflects your account.'}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setQualityMode('standard')}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${qualityMode === 'standard' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                          >
+                            Standard
+                          </button>
+                          <button
+                            onClick={() => setQualityMode('high_quality')}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold ${qualityMode === 'high_quality' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                          >
+                            High Quality
+                          </button>
+                        </div>
+                      </div>
+                      {!isHomeTool && (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{locale === 'zh' ? '高清输出（HD）' : 'HD Output'}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {qualityMode === 'high_quality'
+                                  ? (locale === 'zh' ? 'High Quality 模式下已包含高清输出。' : 'HD is included when High Quality mode is selected.')
+                                  : (locale === 'zh' ? '先生成标准结果；点击 Download HD 时再 +1 积分生成高清。' : 'Generate standard result first; HD is generated on Download HD with +1 credit.')}
+                              </p>
+                            </div>
+                            <label className="inline-flex cursor-pointer items-center">
+                              <input
+                                type="checkbox"
+                                checked={hdEnabled}
+                                onChange={(e) => setHdEnabled(e.target.checked)}
+                                disabled={qualityMode === 'high_quality'}
+                                className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                              />
+                            </label>
+                          </div>
+                          <button
+                            onClick={() => setShowUpgradeChoiceModal(true)}
+                            className="w-full inline-flex items-center justify-center rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                          >
+                            {locale === 'zh' ? '订阅 / 购买积分' : 'Upgrade for Credits'}
+                          </button>
+                        </div>
+                      )}
+                      {isHomeTool && (
+                        <button
+                          onClick={() => setShowUpgradeChoiceModal(true)}
+                          className="w-full inline-flex items-center justify-center rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100"
+                        >
+                          {locale === 'zh' ? '订阅 / 购买积分' : 'Upgrade for Credits'}
+                        </button>
+                      )}
                       <button
                         onClick={() => handleGenerate()}
                         className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-sm"
@@ -1656,8 +2227,27 @@ export default function RemoveShadowTool({
                         <SparklesIcon className="w-4 h-4" />
                         Remove
                       </button>
+                      <p className="text-xs text-slate-500">{creditEstimateLine}</p>
+                      {isHomeTool ? (
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          {creditGuideLine.body}{' '}
+                          <Link href={creditGuideLine.pricingHref} className="font-medium text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap">
+                            {locale === 'zh' ? '定价说明' : 'Pricing'}
+                          </Link>
+                        </p>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
+                          <p className="text-xs font-semibold text-slate-800">{locale === 'zh' ? '积分说明' : 'Credit Guide'}</p>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {creditGuideLine.body}{' '}
+                            <Link href={creditGuideLine.pricingHref} className="font-medium text-primary-600 hover:text-primary-700 hover:underline whitespace-nowrap">
+                              {locale === 'zh' ? '定价与完整规则' : 'Pricing & full rules'}
+                            </Link>
+                          </p>
+                        </div>
+                      )}
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <p className="text-xs text-slate-600 leading-relaxed">{modeHelperText}</p>
+                        <p className="break-words text-xs leading-relaxed text-slate-600">{modeHelperText}</p>
                       </div>
                     </aside>
                    <div onWheel={showReference ? undefined : handleWheelZoom} className={`flex-1 relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${showReference ? 'cursor-default' : (panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair')}`}>
@@ -1701,7 +2291,7 @@ export default function RemoveShadowTool({
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/30 backdrop-blur-sm z-50">
                           <div className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center gap-3">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                            <p className="text-sm font-medium text-slate-700">{isHomeTool ? modeProcessingLabel : (pageText.processingLabel || modeProcessingLabel)}</p>
+                            <p className="text-sm font-medium text-slate-700">{processingLabelOverride || (isHomeTool ? modeProcessingLabel : (pageText.processingLabel || modeProcessingLabel))}</p>
                           </div>
                         </div>
                       )}
@@ -1715,6 +2305,25 @@ export default function RemoveShadowTool({
                         </button>
                         <button className="p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors" onClick={resetView} title="Reset View"><ArrowPathIcon className="w-5 h-5" /></button>
                       </div>
+                      {!isHomeTool && (
+                        <div className="absolute bottom-24 right-6 md:hidden z-[1040] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-slate-700">HD</span>
+                            <button
+                              onClick={() => setHdEnabled(!hdEnabled)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${hdEnabled ? 'bg-primary-600' : 'bg-slate-300'}`}
+                            >
+                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${hdEnabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                            </button>
+                            <button
+                              onClick={() => setShowUpgradeChoiceModal(true)}
+                              className="text-xs font-semibold text-primary-600"
+                            >
+                              {locale === 'zh' ? '升级' : 'Upgrade'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute bottom-6 right-6 md:hidden z-[1040]">
                         <button onClick={() => handleGenerate()} className="flex items-center justify-center w-14 h-14 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all active:scale-95">
                           <SparklesIcon className="w-6 h-6" />
