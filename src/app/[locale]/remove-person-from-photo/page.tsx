@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -51,27 +51,28 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}/remove-person-from-photo` : `/${locale}/remove-person-from-photo`;
+  const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
-      title: "Travel photo cleanup",
-      desc: "Remove tourists and passersby from landmark photos to keep focus on the destination.",
-      note: "Best for busy landmarks where background crowds distract from the location story.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
+      title: "Group photo — remove one person",
+      desc: "Erase a single person from a formal or large group shot while keeping everyone else looking natural.",
+      note: "Ideal for class photos, team pictures, and events where one face needs to disappear from the frame.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample1-remove-people-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample1-remove-people-after.jpg")
     },
     {
-      title: "Portrait background cleanup",
-      desc: "Delete distracting people behind your subject and keep the portrait composition clean.",
-      note: "Great for portraits that need full attention on the main subject without background interruptions.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png"
+      title: "Friends group shot — remove someone",
+      desc: "Take one person out of a casual friends photo when you need a cleaner crop or updated group image.",
+      note: "Works for social posts and albums where you still want the scene to feel spontaneous and real.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-after.jpg")
     },
     {
-      title: "E-commerce scene cleanup",
-      desc: "Remove unwanted people or reflections from product scenes for conversion-ready visuals.",
-      note: "Useful for listing images where cleaner product framing helps buyers focus faster.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
+      title: "Meeting room — remove an attendee",
+      desc: "Remove one person from a conference or meeting photo for reports, decks, or internal comms.",
+      note: "Handy when someone has left the team, privacy matters, or the slide needs a tighter group.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample3-remove-people-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample3-remove-people-after.jpg")
     }
   ];
   const faqItems = [
@@ -80,16 +81,16 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
       a: "You can start for free and process common person removal edits online."
     },
     {
-      q: "Can I remove tourists or crowds from travel photos?",
-      a: "Yes. Brush each person area you want to remove and process in one or multiple passes for clean travel photos."
+      q: "Can I remove someone from a group or class photo?",
+      a: "Yes. Paint over the person you want gone—alone or together with others—and run removal. Multiple passes help in tight groups."
     },
     {
       q: "How do I get more natural edges after removing a person?",
       a: "Paint slightly beyond the subject boundary so AI gets enough nearby context to reconstruct textures naturally."
     },
     {
-      q: "Can I use this for ecommerce and listing images?",
-      a: "Yes. It works for product scenes, lifestyle images, and property photos where unwanted people reduce clarity."
+      q: "Does it work for meeting or office photos?",
+      a: "Yes. It is useful for team pictures and conference shots when someone should not appear or you need a tighter group for slides."
     },
     {
       q: "What image formats are supported?",
@@ -105,7 +106,7 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Remove People from Photo Online",
-      "description": "Remove people from photos online with AI and clean distracting subjects from travel, portrait, and ecommerce images.",
+      "description": "Remove people from photos online with AI for group shots, friend photos, and meeting scenes.",
       "url": pageUrl,
       "inLanguage": locale
     },
@@ -116,12 +117,12 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
       "applicationCategory": "PhotographyApplication",
       "operatingSystem": "Web",
       "url": pageUrl,
-      "description": "AI tool to remove people from photos while preserving realistic background continuity.",
+      "description": "AI tool to remove a person from group photos, friend shots, and meeting images with natural background fill.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "featureList": [
-        "Remove people from photo online",
-        "Erase tourists and crowd from background",
-        "Brush-based local editing steps",
+        "Remove one person from group and team photos",
+        "Friend photos and meeting room cleanup",
+        "Brush-based local editing",
         "JPG PNG WebP export"
       ]
     },
@@ -152,10 +153,10 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
         <div className="mx-auto max-w-6xl px-6 py-12 lg:py-16">
           <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight">Remove People from Photo Online</h1>
           <p className="mt-4 text-lg text-slate-600 max-w-3xl">
-            Remove unwanted people from photos in seconds with AI. Clean up tourists, crowds, and background strangers while keeping natural texture and composition.
+            Remove one or more people from photos in seconds with AI—group pictures, friend shots, meeting rooms, and busy backgrounds—with natural-looking fills.
           </p>
           <p className="mt-3 text-slate-600 max-w-3xl">
-            Perfect for travel photography, portraits, real estate, and ecommerce visuals where unwanted people distract from the main subject.
+            Great when someone should not appear in the final image, you need a cleaner team or class photo, or a presentation-ready picture without a reshoot.
           </p>
 
           <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -163,11 +164,19 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg" alt="Before remove person" className="w-full h-56 object-cover rounded-xl" />
+                  <img
+                    src={cases[0].beforeUrl}
+                    alt="Before remove person"
+                    className="w-full h-56 object-contain object-center bg-slate-100 rounded-xl"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg" alt="After remove person" className="w-full h-56 object-cover rounded-xl" />
+                  <img
+                    src={cases[0].afterUrl}
+                    alt="After remove person"
+                    className="w-full h-56 object-contain object-center bg-slate-100 rounded-xl"
+                  />
                 </div>
               </div>
             </div>
@@ -180,7 +189,7 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 1</p>
                 <h3 className="mt-2 font-semibold text-slate-900">Import your image</h3>
-                <p className="mt-2 text-sm text-slate-600">Upload a travel, portrait, street, or ecommerce image. JPG, PNG, and WebP are supported.</p>
+                <p className="mt-2 text-sm text-slate-600">Upload a group photo, friends shot, meeting image, or any picture with people to edit. JPG, PNG, and WebP are supported.</p>
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 2</p>
@@ -200,14 +209,14 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Simple focused editing</h3><p className="mt-2 text-sm text-slate-600">Designed for quickly removing unwanted people without complicated retouch steps.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Natural background continuity</h3><p className="mt-2 text-sm text-slate-600">AI reconstructs nearby texture to avoid obvious cloning artifacts in complex scenes.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works for multiple scenarios</h3><p className="mt-2 text-sm text-slate-600">Use it for travel photos, portraits, social media assets, property listings, and product scenes.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Built for real group situations</h3><p className="mt-2 text-sm text-slate-600">From class and team photos to nights out and office meetings—remove who you need without rebuilding the whole shot.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Fast online editing</h3><p className="mt-2 text-sm text-slate-600">Upload, brush, process, and download in a simple browser flow.</p></div>
             </div>
           </section>
 
           <section className="mt-14">
             <h2 className="text-3xl font-bold text-slate-900">Use cases and results</h2>
-            <p className="mt-3 text-slate-600">See how different scenes look cleaner after removing distracting people from the background.</p>
+            <p className="mt-3 text-slate-600">See how group, social, and workplace photos look after removing one person from the frame.</p>
             <div className="mt-7 space-y-8">
               {cases.map((item) => (
                 <article key={item.title} className="rounded-3xl border border-slate-200 bg-white p-6 lg:p-8 shadow-sm">
@@ -223,8 +232,16 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <img src={item.beforeUrl} alt={`${item.title} before`} className="w-full h-48 object-cover rounded-xl" />
-                      <img src={item.afterUrl} alt={`${item.title} after`} className="w-full h-48 object-cover rounded-xl" />
+                      <img
+                        src={item.beforeUrl}
+                        alt={`${item.title} before`}
+                        className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl"
+                      />
+                      <img
+                        src={item.afterUrl}
+                        alt={`${item.title} after`}
+                        className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl"
+                      />
                     </div>
                   </div>
                 </article>

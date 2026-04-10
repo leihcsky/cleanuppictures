@@ -52,25 +52,25 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
   const homeModeHref = `${getLinkHref(locale, '')}?mode=text`;
   const cases = [
     {
-      title: "Social media cleanup",
-      desc: "Remove emoji stickers and decorative overlays from social posts to recover cleaner visuals.",
-      note: "Perfect for reposting social content when emoji overlays hide key visual information.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
+      title: "Portrait emoji cleanup",
+      desc: "Remove large emoji overlays from portrait photos while preserving natural facial details.",
+      note: "Ideal for recovering personal photos where face stickers block key features.",
+      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg",
+      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-after.jpg"
     },
     {
-      title: "Product image polish",
-      desc: "Erase emoji annotations and icon marks from product shots for more professional listings.",
-      note: "Useful for ecommerce images that need a cleaner look before publishing to marketplaces.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
+      title: "Business meeting photos",
+      desc: "Clean emoji marks and overlays from meeting images for presentations and reports.",
+      note: "Great for professional decks where visual clarity and context matter.",
+      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample2-remove-emoji-before.jpg",
+      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample2-remove-emoji-after.jpg"
     },
     {
-      title: "Presentation-ready photos",
-      desc: "Remove playful stickers and emoji labels from shared images when you need a cleaner final version.",
-      note: "Great for team decks and reports where clean, distraction-free visuals are required.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
+      title: "Product image cleanup",
+      desc: "Remove sticker-like emoji elements from product photos for cleaner commercial visuals.",
+      note: "Useful for storefront, ads, and catalog images that need a polished appearance.",
+      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-before.jpg",
+      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-after.jpg"
     }
   ];
   const faqItems = [
@@ -144,11 +144,11 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg" alt="Before remove emoji" className="w-full h-56 object-cover rounded-xl" />
+                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg" alt="Before remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg" alt="After remove emoji" className="w-full h-56 object-cover rounded-xl" />
+                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-after.jpg" alt="After remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>

@@ -72,7 +72,7 @@ export default function Pricing({
       title: pricingText.freeTitle,
       price: pricingText.freePrice,
       period: '',
-      description: isZh ? '仅体验 Standard，适合轻度试用。' : 'Standard-only experience for quick trials.',
+      description: isZh ? '快速试用与轻度编辑。' : 'For quick trials and light edits.',
       features: [
         isZh ? '每日 3 次免费 Standard 处理' : '3 free Standard edits per day',
         isZh ? '仅支持 Standard cleanup' : 'Standard cleanup only',
@@ -89,7 +89,7 @@ export default function Pricing({
       title: pricingText.payGoTitle,
       price: locale === 'zh' ? `低至 ${creditPackOffers[0]?.priceDisplay || '$5'}` : `From ${creditPackOffers[0]?.priceDisplay || '$5'}`,
       period: '',
-      description: isZh ? '轻度用户按需付费，功能完整。' : 'Full features, pay only when you need them.',
+      description: isZh ? '按需付费，灵活使用不过期。' : 'Flexible pay-per-use with no expiry.',
       features: [
         isZh ? '按使用付费，不浪费预算' : 'Pay only for what you use',
         isZh ? '标准模式与高质量模式均可使用' : 'Standard and High Quality included',
@@ -107,11 +107,11 @@ export default function Pricing({
       price: monthlySubscription.priceDisplay,
       period: pricingText.perMonth,
       description: isZh
-        ? `每月含 ${monthlySubscription.credits} 积分 · 解锁全部能力`
-        : `${monthlySubscription.credits} credits every month · Full access`,
+        ? `每月 ${monthlySubscription.credits} 积分，适合高频用户`
+        : `${monthlySubscription.credits} credits/month for frequent users`,
       features: [
         isZh ? '包含全部功能' : 'All features included',
-        isZh ? '高质量模式更划算' : 'Better value on High Quality',
+        isZh ? 'High Quality 更省积分（Pro 价）' : 'High Quality uses fewer credits (Pro rate)',
         isZh ? 'HD 下载已包含' : 'HD downloads included',
         isZh ? '处理更快' : 'Faster processing',
         isZh ? '优先处理通道' : 'Priority access',
@@ -138,6 +138,10 @@ export default function Pricing({
         a: '不会。按量购买的额度永久有效，可随时用于后续编辑。'
       },
       {
+        q: '订阅积分会结转到下个月吗？',
+        a: '不会。订阅包含的积分仅在当期订阅周期内有效，到期作废；不会累计到下个月。'
+      },
+      {
         q: 'Pro 相对按量有什么优势？',
         a: '按月给到稳定额度，并享有更快队列与优先处理，适合经常使用高质量模式的用户。'
       },
@@ -147,7 +151,7 @@ export default function Pricing({
       },
       {
         q: '什么时候会计费？',
-        a: '仅在成功生成可用结果后计费；处理失败不收取费用。'
+        a: '仅在成功生成可用结果后才会扣除积分；处理失败不扣费。若遇到系统错误（例如服务端异常/中断），可联系客服核查并补偿。'
       },
       {
         q: '我可以先订阅 Pro，再额外购买按量额度吗？',
@@ -172,6 +176,10 @@ export default function Pricing({
         a: 'No. Purchased balance never expires and stays available for future edits.'
       },
       {
+        q: 'Do subscription credits roll over?',
+        a: 'No. Subscription credits are valid only within the current billing period and expire at the end of the period.'
+      },
+      {
         q: 'What are the advantages of Pro over pay-as-you-go?',
         a: 'A predictable monthly allowance, faster queueing, and priority processing—great if you use High Quality often.'
       },
@@ -181,7 +189,7 @@ export default function Pricing({
       },
       {
         q: 'When am I charged?',
-        a: 'You are charged only after a successful result. Failed runs are not billed.'
+        a: 'Credits are deducted only after a successful result. Failed runs are not billed. If you hit a system error (e.g. server-side failure), contact support and we can review and compensate when appropriate.'
       },
       {
         q: 'Can I subscribe to Pro and buy pay-as-you-go add-ons?',
@@ -206,10 +214,8 @@ export default function Pricing({
           <h2 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">
             {isZh ? '更好结果，简单定价' : 'Better results, simple pricing'}
           </h2>
-          <p className="mt-4 text-lg leading-8 text-slate-600">
-            {isZh
-              ? 'Free、按量与 Pro 三层可选；高质量模式面向更干净、更清晰、更稳定的输出。单次扣费请以工具内提示为准。'
-              : 'Choose Free, pay-as-you-go, or Pro. High Quality mode is for cleaner, sharper, more reliable output. Per-run usage is shown in the tool.'}
+          <p className="mt-3 text-sm font-medium text-slate-600">
+            {isZh ? '无隐藏费用——所见即所付。' : 'No hidden fees — what you see is what you pay.'}
           </p>
           <p className="mt-4 text-sm text-slate-500">
             By purchasing, you agree to our{" "}
@@ -320,6 +326,11 @@ export default function Pricing({
                 </tr>
               </thead>
               <tbody>
+                <tr className="border-b border-slate-100">
+                  <td className="py-3 pr-4 text-slate-700">{isZh ? '单次消耗' : 'Credits per run'}</td>
+                  <td className="py-3 px-4 text-center text-slate-700">{isZh ? '1 积分' : '1 credit'}</td>
+                  <td className="py-3 pl-4 text-center text-emerald-700">{isZh ? '按量 2 / Pro 1' : 'Pay-Go 2 / Pro 1'}</td>
+                </tr>
                 <tr className="border-b border-slate-100">
                   <td className="py-3 pr-4 text-slate-700">{isZh ? '适用计划' : 'Available in'}</td>
                   <td className="py-3 px-4 text-center text-slate-700">{isZh ? 'Free / 按量 / Pro' : 'Free / Pay-Go / Pro'}</td>

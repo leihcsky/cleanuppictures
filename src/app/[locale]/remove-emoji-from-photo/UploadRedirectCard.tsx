@@ -2,45 +2,21 @@
 
 import { useRef, type ChangeEvent } from "react";
 import { ArrowUpOnSquareIcon } from "@heroicons/react/24/outline";
-
-const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
-const UPLOAD_STORE_NAME = 'pending_uploads';
-
-const openUploadDb = () =>
-  new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open(UPLOAD_DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(UPLOAD_STORE_NAME)) {
-        db.createObjectStore(UPLOAD_STORE_NAME);
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-
-const saveUploadBlob = async (key: string, blob: Blob) => {
-  const db = await openUploadDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(UPLOAD_STORE_NAME, 'readwrite');
-    tx.objectStore(UPLOAD_STORE_NAME).put(blob, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
-  db.close();
-};
+import { getLinkHref, hrefWithSearchParams, getImageProxyHref } from "~/configs/buildLink";
+import { saveUploadBlob } from "~/lib/uploadRedirectBridge";
+import { useToolLandingNavigation } from "~/lib/useToolLandingNavigation";
 
 export default function UploadRedirectCard({ locale }) {
+  const pushToolHome = useToolLandingNavigation(locale);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const sampleUrls = [
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg'
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg',
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample2-remove-emoji-before.jpg',
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-before.jpg'
   ];
 
   const gotoHome = () => {
-    window.location.href = `/${locale}?mode=text`;
+    pushToolHome(hrefWithSearchParams(getLinkHref(locale, ''), { mode: 'text' }));
   };
 
   const handleUploadClick = () => {
@@ -75,10 +51,8 @@ export default function UploadRedirectCard({ locale }) {
     }
   };
 
-  const loadSample = (url: string) => {
-    const proxied = `/${locale}/api/image-proxy?url=${encodeURIComponent(url)}`;
-    sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({ type: 'url', value: proxied }));
-    gotoHome();
+  const loadSample = (remoteUrl: string) => {
+    pushToolHome(hrefWithSearchParams(getLinkHref(locale, ''), { mode: 'text', sample: remoteUrl }));
   };
 
   return (

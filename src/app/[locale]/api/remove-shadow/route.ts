@@ -1,4 +1,5 @@
 import { getReplicateClient } from "~/libs/replicateClient";
+import { getUserFacingAiErrorMessage, resolveAiErrorLocale } from "~/lib/aiErrorUserMessage";
 import { getDb } from "~/libs/db";
 import { getBusinessDateString } from "~/libs/date";
 import { getToken } from "next-auth/jwt";
@@ -47,6 +48,16 @@ interface KieTaskDetailsResponse {
 
 const GUEST_COOKIE_KEY = "cp_guest_user_id";
 const FREE_DAILY_LIMIT = Number(process.env.FREE_TIMES || 3);
+const FREE_DAILY_IP_LIMIT = Math.max(FREE_DAILY_LIMIT, Number(process.env.FREE_TIMES_IP || 6));
+const API_RATE_LIMIT_PER_MIN = Math.max(1, Number(process.env.API_RATE_LIMIT_PER_MIN || 12));
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+type RateWindow = {
+  windowStart: number;
+  count: number;
+};
+
+const ipMinuteBuckets = new Map<string, RateWindow>();
 
 type UserAccessContext = {
   userId: number;
@@ -60,6 +71,23 @@ type UserAccessContext = {
 
 function getClientIp(req: NextRequest) {
   return (req.headers.get("x-forwarded-for") || "").split(",")[0].trim();
+}
+
+function isIpRateLimited(ip: string) {
+  if (!ip) return { limited: false, retryAfterSec: 0 };
+  const now = Date.now();
+  const prev = ipMinuteBuckets.get(ip);
+  if (!prev || now - prev.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    ipMinuteBuckets.set(ip, { windowStart: now, count: 1 });
+    return { limited: false, retryAfterSec: 0 };
+  }
+  prev.count += 1;
+  ipMinuteBuckets.set(ip, prev);
+  if (prev.count <= API_RATE_LIMIT_PER_MIN) {
+    return { limited: false, retryAfterSec: 0 };
+  }
+  const retryAfterSec = Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - prev.windowStart)) / 1000));
+  return { limited: true, retryAfterSec };
 }
 
 function normalizeQuality(raw: any) {
@@ -194,6 +222,20 @@ async function getTodayUsage(userId: number) {
     usedCount: rowRes.rows.length > 0 ? Number(rowRes.rows[0].used_count || 0) : 0,
     rowId: rowRes.rows.length > 0 ? Number(rowRes.rows[0].id || 0) : 0
   };
+}
+
+async function getTodayGuestUsageByIp(ip: string) {
+  if (!ip) return 0;
+  const db = getDb();
+  const today = getBusinessDateString();
+  const rowRes = await db.query(
+    `select coalesce(sum(d.used_count), 0) as used
+     from daily_usage d
+     join users u on u.id=d.user_id
+     where d.date=$1 and u.is_guest=$2 and u.last_login_ip=$3`,
+    [today, true, ip]
+  );
+  return Number(rowRes.rows?.[0]?.used || 0);
 }
 
 async function increaseTodayUsage(userId: number) {
@@ -356,11 +398,27 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   let jobId = 0;
   let guestCookieValue: string | undefined;
+  let localeHint: unknown;
+  const clientIp = getClientIp(req);
+  const rateLimit = isIpRateLimited(clientIp);
+  if (rateLimit.limited) {
+    return buildResponse(
+      {
+        msg: "Request limit reached. Please wait a moment and try again.",
+        status: 429,
+        retry_after: rateLimit.retryAfterSec
+      },
+      429
+    );
+  }
   try {
     const json = await req.json();
+    localeHint = json?.locale;
     const action = String(json?.action || "remove");
     const upscaleOnly = action === "upscale_hd";
     const { imageDataUrl, maskDataUrl, kieMaskDataUrl, scene, resizedForLama } = json;
+    const imageWidth = Number(json?.imageWidth || 0);
+    const imageHeight = Number(json?.imageHeight || 0);
     const quality = normalizeQuality(json?.quality);
     const mode = normalizeEditMode(json?.mode);
     const isHd = Boolean(json?.hd);
@@ -396,6 +454,16 @@ export async function POST(req: NextRequest) {
     if (userContext.isFreeTier) {
       if (upscaleOnly || quality !== "standard" || isHd) {
         return buildResponse({ msg: "Free users support Standard mode only.", status: 602 }, 200, guestCookieValue);
+      }
+      if (userContext.isGuest) {
+        const ipUsedCount = await getTodayGuestUsageByIp(clientIp);
+        if (ipUsedCount >= FREE_DAILY_IP_LIMIT) {
+          return buildResponse(
+            { msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 },
+            200,
+            guestCookieValue
+          );
+        }
       }
       if (userContext.todayUsedCount >= FREE_DAILY_LIMIT) {
         return buildResponse({ msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 }, 200, guestCookieValue);
@@ -446,6 +514,10 @@ export async function POST(req: NextRequest) {
     const swinirNoiseInput = Number.isFinite(swinirNoise) ? swinirNoise : 15;
     const swinirTaskType = process.env.REPLICATE_HD_SWINIR_TASK_TYPE || "Real-World Image Super-Resolution-Large";
     const isTextSd = mode === "text" && selectedVariant === "sd_inpaint";
+    /** SD 1.x inpaint on Replicate often fails (Prediction interrupted / PA) on multi‑MP inputs; cap long edge like LaMa. */
+    const sdMaxSide = Math.max(512, Number(process.env.REPLICATE_SHADOW_SD_MAX_SIDE || "1024") || 1024);
+    /** Text mode: two SD runs double timeout/OOM risk; default single pass unless env enables. */
+    const sdTextTwoPass = (process.env.REPLICATE_SHADOW_SD_TEXT_TWO_PASS || "0") === "1";
     const sdInput = {
       prompt: sdPrompt,
       negative_prompt: sdNegativePrompt,
@@ -473,6 +545,16 @@ export async function POST(req: NextRequest) {
       modelToRun = process.env.REPLICATE_SHADOW_MODEL_RUN_LAMA || "allenhooo/lama";
       input = { image: imageDataUrl, mask: maskInput };
     } else {
+      if (!upscaleOnly && !resizedForLama && imageWidth > 0 && imageHeight > 0) {
+        const longSide = Math.max(imageWidth, imageHeight);
+        if (longSide > sdMaxSide) {
+          return buildResponse(
+            { need_client_resize: true, maxSide: sdMaxSide, status: 200 },
+            200,
+            guestCookieValue
+          );
+        }
+      }
       input = sdInput;
     }
 
@@ -500,8 +582,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const imageWidth = Number(json?.imageWidth || 0);
-    const imageHeight = Number(json?.imageHeight || 0);
     const imageUrlToStore = imageDataUrl.length > 60000 ? imageDataUrl.slice(0, 60000) : imageDataUrl;
     const imageInsertRes = await db.query("insert into images(user_id,url,width,height) values($1,$2,$3,$4)", [
       userContext.userId,
@@ -586,7 +666,7 @@ export async function POST(req: NextRequest) {
 
     let output;
     try {
-      if (selectedVariant === "sd_inpaint" && sdTwoPass) {
+      if (selectedVariant === "sd_inpaint" && sdTwoPass && (!isTextSd || sdTextTwoPass)) {
         const pass1Input = {
           ...sdInput,
           num_inference_steps: sdPass1Steps,
@@ -722,6 +802,8 @@ export async function POST(req: NextRequest) {
       }
     }
     console.error("AI refine failed:", err);
-    return buildResponse({ msg: "AI refine failed.", error: String(err), status: 500 }, 500, guestCookieValue);
+    const loc = resolveAiErrorLocale(localeHint);
+    const userMsg = getUserFacingAiErrorMessage(String(err), loc);
+    return buildResponse({ msg: userMsg, status: 500 }, 500, guestCookieValue);
   }
 }

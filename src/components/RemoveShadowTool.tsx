@@ -2,7 +2,7 @@
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { useCommonContext } from "~/context/common-context";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import Script from "next/script";
 import Link from "next/link";
 import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon, SparklesIcon, PaintBrushIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, ChevronLeftIcon, Squares2X2Icon, ArrowUpIcon, ExclamationTriangleIcon, CreditCardIcon, ShoppingBagIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
@@ -10,7 +10,7 @@ import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
 import { Dialog, Menu, Transition } from "@headlessui/react";
 import ComparisonSlider from "./ComparisonSlider";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/billingPolicy";
 import { getStripe } from "~/libs/stripeClient";
 
@@ -74,13 +74,17 @@ function isStandardWithoutHd(quality: "standard" | "high_quality", hd: boolean):
   return quality === "standard" && !hd;
 }
 
+/** Landing-page redirect → home: absorb stray pointer activation before first paint (see useLayoutEffect below). */
+const REDIRECT_EXIT_GUARD_MS = 2500;
+
 export default function RemoveShadowTool({
   locale,
   pageName,
   pageText,
   toolText,
   apiPath = "remove-shadow",
-  initialMode = "object"
+  initialMode = "object",
+  initialLandingSampleUrl = null
 }) {
   const { setShowLoadingModal, setShowLoginModal, userData } = useCommonContext();
   const isHomeTool = !pageName;
@@ -132,6 +136,8 @@ export default function RemoveShadowTool({
   const [processingLabelOverride, setProcessingLabelOverride] = useState('');
   const [billingOverview, setBillingOverview] = useState<Record<string, unknown> | null>(null);
   const [billingOverviewLoading, setBillingOverviewLoading] = useState(false);
+  const [blockExitClick, setBlockExitClick] = useState(false);
+  const exitBlockedUntilRef = useRef(0);
 
   // Debounce
   const [debouncedStrength, setDebouncedStrength] = useState(strength);
@@ -330,6 +336,8 @@ export default function RemoveShadowTool({
     mask.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return false;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
     return true;
@@ -386,54 +394,77 @@ export default function RemoveShadowTool({
     setTooltipState(prev => ({...prev, visible: false}));
   }, []);
 
-  const buildSampleProxyUrl = useCallback((remoteUrl: string) => {
-    return `/${locale}/api/image-proxy?url=${encodeURIComponent(remoteUrl)}`;
-  }, [locale]);
+  const buildSampleProxyUrl = useCallback(
+    (remoteUrl: string) => getImageProxyHref(locale, remoteUrl),
+    [locale]
+  );
 
   // SAMPLES
   const SAMPLES = [
     {
-      id: 'portrait',
+      id: 'content-creators',
       title: pageText.sample1Title || 'Portrait Face Shadow',
       desc: pageText.sample1Desc || 'Remove harsh shadows from faces caused by sunlight or hats.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg'), 
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png'),
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-after.jpg'),
       settings: { strength: 88, aggressive: false },
       imagePosition: 'center 40%'
     },
     {
-      id: 'product',
+      id: 'marketing-teams',
       title: pageText.sample2Title || 'Product Photography',
       desc: pageText.sample2Desc || 'Clean up distracting cast shadows to make products look professional.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg'),
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-after.jpg'),
       settings: { strength: 92, aggressive: true },
       imagePosition: 'center 55%'
     },
     {
-      id: 'building',
+      id: 'real-estate-teams',
       title: pageText.sample3Title || 'Document Scan',
       desc: pageText.sample3Desc || 'Remove phone shadows from photos of documents and paper.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg'),
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-after.jpg'),
       settings: { strength: 86, aggressive: false },
       imagePosition: 'center 58%'
     },
     {
-      id: 'general',
+      id: 'ecommerce-sellers',
       title: pageText.sample4Title || 'General Object Shadow',
       desc: pageText.sample4Desc || 'Clean cast shadows around everyday objects for a clearer and more balanced photo.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg'),
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-before.jpg'),
+      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-after.jpg'),
       settings: { strength: 88, aggressive: false },
       imagePosition: 'center 52%'
     }
   ];
+  const HOME_UPLOAD_THUMBNAILS = [
+    {
+      id: 'home-upload-object',
+      title: 'Remove object sample',
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-before.jpg')
+    },
+    {
+      id: 'home-upload-person',
+      title: 'Remove person sample',
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-before.jpg')
+    },
+    {
+      id: 'home-upload-text',
+      title: 'Remove text sample',
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-before.jpg')
+    },
+    {
+      id: 'home-upload-emoji',
+      title: 'Remove emoji sample',
+      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg')
+    }
+  ];
   const HOME_USE_CASES = [
-    { key: 'photographers', label: 'Content Creators', sampleId: 'portrait' },
-    { key: 'agencies', label: 'Marketing Teams', sampleId: 'general' },
-    { key: 'realestate', label: 'Real Estate Teams', sampleId: 'building' },
-    { key: 'ecommerce', label: 'Ecommerce Sellers', sampleId: 'product' }
+    { key: 'photographers', label: 'Content Creators', sampleId: 'content-creators' },
+    { key: 'agencies', label: 'Marketing Teams', sampleId: 'marketing-teams' },
+    { key: 'realestate', label: 'Real Estate Teams', sampleId: 'real-estate-teams' },
+    { key: 'ecommerce', label: 'Ecommerce Sellers', sampleId: 'ecommerce-sellers' }
   ];
   const [activeHomeUseCase, setActiveHomeUseCase] = useState(HOME_USE_CASES[0].key);
 
@@ -501,47 +532,105 @@ export default function RemoveShadowTool({
     };
     img.src = url;
   }, []);
-  const loadImageFromSource = useCallback((source: string) => {
-    setHistory([]);
-    setHistoryStep(-1);
-    setMaskCanvasData(null);
-    setShowReference(false);
-    const img = new Image();
-    if (/^https?:\/\//i.test(source)) {
-      img.crossOrigin = 'anonymous';
-    }
-    img.onload = () => {
-      setOriginalImage(img);
-      setImageSrc(source);
-      setStrength(90);
-      if (maskCanvasRef.current) {
-        const ctx = maskCanvasRef.current.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
-      }
+  const loadImageFromSource = useCallback(
+    (
+      source: string,
+      opts?: { onSettled?: () => void; alertOnError?: boolean; alertOnlyIfMounted?: () => boolean }
+    ) => {
+      setHistory([]);
+      setHistoryStep(-1);
       setMaskCanvasData(null);
-    };
-    img.src = source;
-  }, []);
+      setShowReference(false);
+      const img = new Image();
+      if (/^https?:\/\//i.test(source)) {
+        img.crossOrigin = 'anonymous';
+      }
+      const settled = () => {
+        opts?.onSettled?.();
+      };
+      const shouldAlert = () => opts?.alertOnlyIfMounted?.() ?? true;
+      img.onload = () => {
+        setOriginalImage(img);
+        setImageSrc(source);
+        setStrength(90);
+        if (maskCanvasRef.current) {
+          const ctx = maskCanvasRef.current.getContext('2d');
+          if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+        }
+        setMaskCanvasData(null);
+        settled();
+      };
+      img.onerror = () => {
+        // Fallback: when proxy is temporarily unavailable, retry once with raw remote URL.
+        if (source.includes('/api/image-proxy?')) {
+          try {
+            const parsed = new URL(source, window.location.origin);
+            const raw = parsed.searchParams.get('url');
+            if (raw && raw !== source) {
+              loadImageFromSource(raw, opts);
+              return;
+            }
+          } catch {
+            // ignore and continue to normal error flow
+          }
+        }
+        settled();
+        if (opts?.alertOnError && shouldAlert()) {
+          alert('Failed to load the image. Please retry in a moment.');
+        }
+      };
+      img.src = source;
+    },
+    []
+  );
   useEffect(() => {
+    let alive = true;
+    const clearPending = () => {
+      try {
+        sessionStorage.removeItem('cleanup_pending_upload');
+      } catch {
+        /* ignore */
+      }
+    };
     const loadPendingUpload = async () => {
       try {
+        if (initialLandingSampleUrl) return;
         const raw = sessionStorage.getItem('cleanup_pending_upload');
         if (!raw) return;
-        const payload = JSON.parse(raw);
+        let payload: { type?: string; value?: string; name?: string; mime?: string };
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          clearPending();
+          return;
+        }
+        const finishPendingIfStillMounted = () => {
+          if (alive) clearPending();
+        };
         if (payload?.type === 'data' && typeof payload.value === 'string') {
-          loadImageFromSource(payload.value);
-          sessionStorage.removeItem('cleanup_pending_upload');
+          loadImageFromSource(payload.value, {
+            onSettled: finishPendingIfStillMounted,
+            alertOnError: true,
+            alertOnlyIfMounted: () => alive
+          });
           return;
         }
         if (payload?.type === 'url' && typeof payload.value === 'string') {
-          loadImageFromSource(payload.value);
-          sessionStorage.removeItem('cleanup_pending_upload');
+          loadImageFromSource(payload.value, {
+            onSettled: finishPendingIfStillMounted,
+            alertOnError: true,
+            alertOnlyIfMounted: () => alive
+          });
           return;
         }
         if (payload?.type === 'idb' && typeof payload.value === 'string') {
-          const blob = await readUploadBlob(payload.value);
-          await deleteUploadBlob(payload.value);
-          sessionStorage.removeItem('cleanup_pending_upload');
+          const token = payload.value;
+          const blob = await readUploadBlob(token);
+          // Strict Mode: first effect run's component unmounts before await finishes; do not delete
+          // session/IDB or call setState on that instance. The remounted instance will read again.
+          if (!alive) return;
+          await deleteUploadBlob(token);
+          clearPending();
           if (!blob) return;
           const file = new File([blob], String(payload?.name || 'upload'), {
             type: String(payload?.mime || blob.type || 'image/png')
@@ -549,13 +638,67 @@ export default function RemoveShadowTool({
           processFile(file);
           return;
         }
-        sessionStorage.removeItem('cleanup_pending_upload');
+        clearPending();
       } catch {
-        sessionStorage.removeItem('cleanup_pending_upload');
+        if (alive) clearPending();
       }
     };
     void loadPendingUpload();
-  }, [loadImageFromSource, processFile]);
+    return () => {
+      alive = false;
+    };
+  }, [loadImageFromSource, processFile, initialLandingSampleUrl]);
+
+  // Landing-page sample: same proxy URL as the landing thumbnail <img> (no ?t=) so the browser can reuse cache after client nav.
+  useLayoutEffect(() => {
+    if (!isHomeTool || !initialLandingSampleUrl) return;
+    const proxied = getImageProxyHref(locale, initialLandingSampleUrl);
+    loadImageFromSource(proxied);
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('sample')) return;
+      url.searchParams.delete('sample');
+      const qs = url.searchParams.toString();
+      window.history.replaceState(null, '', `${url.pathname}${qs ? `?${qs}` : ''}${url.hash}`);
+    } catch {
+      /* ignore */
+    }
+  }, [isHomeTool, initialLandingSampleUrl, locale, loadImageFromSource]);
+
+  // Prevent stray pointer events from exiting right after landing-page redirect.
+  // useEffect runs after paint — a cached pending image can show the editor first; useLayoutEffect runs before paint.
+  // Do not remove cleanup_redirect_ts until the guard ends (Strict Mode remount must still see the flag).
+  useLayoutEffect(() => {
+    try {
+      const tsRaw = sessionStorage.getItem('cleanup_redirect_ts');
+      if (!tsRaw) return;
+      const ts = Number(tsRaw || 0);
+      if (!Number.isFinite(ts) || ts <= 0) {
+        sessionStorage.removeItem('cleanup_redirect_ts');
+        return;
+      }
+      const age = Date.now() - ts;
+      if (age >= REDIRECT_EXIT_GUARD_MS) {
+        sessionStorage.removeItem('cleanup_redirect_ts');
+        return;
+      }
+      const remain = REDIRECT_EXIT_GUARD_MS - Math.max(0, age);
+      exitBlockedUntilRef.current = Date.now() + remain;
+      setBlockExitClick(true);
+      const t = window.setTimeout(() => {
+        exitBlockedUntilRef.current = 0;
+        setBlockExitClick(false);
+        try {
+          sessionStorage.removeItem('cleanup_redirect_ts');
+        } catch {
+          /* ignore */
+        }
+      }, remain);
+      return () => window.clearTimeout(t);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const openFilePicker = useCallback(() => {
     if (!fileInputRef.current) return;
@@ -634,7 +777,9 @@ export default function RemoveShadowTool({
     window.addEventListener('mouseup', onUp);
   };
   const resetView = () => {
-    setZoom(1); setPanX(0); setPanY(0);
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const handleWheelZoom = (e) => {
@@ -1086,7 +1231,8 @@ export default function RemoveShadowTool({
         action: 'upscale_hd',
         imageDataUrl: canvasRef.current.toDataURL('image/png'),
         imageWidth: canvasRef.current.width,
-        imageHeight: canvasRef.current.height
+        imageHeight: canvasRef.current.height,
+        locale
       };
       const { response: res, json } = await requestRemoveShadow(payload);
       if (!(res.ok && json?.output_url)) {
@@ -1315,6 +1461,8 @@ export default function RemoveShadowTool({
         imageDataUrl: resizedImage,
         maskDataUrl: resizedMask,
         kieMaskDataUrl: resizedKieMask,
+        imageWidth: targetWidth,
+        imageHeight: targetHeight,
         resizedForLama: true
       };
     };
@@ -1360,7 +1508,8 @@ export default function RemoveShadowTool({
         imageWidth: canvasRef.current?.width || 0,
         imageHeight: canvasRef.current?.height || 0,
         quality: qualityMode,
-        hd: false
+        hd: false,
+        locale
       };
       let { response: res, json } = await requestRemoveShadow(payload);
       if (res.ok && json?.need_client_resize) {
@@ -1603,6 +1752,7 @@ export default function RemoveShadowTool({
   }, [originalImage, showReference]);
 
   const handleNewImage = () => {
+    if (Date.now() < exitBlockedUntilRef.current) return;
     sessionStorage.removeItem('cleanup_pending_upload');
     if (isHomeTool) {
       setEditorMode('object');
@@ -1909,7 +2059,7 @@ export default function RemoveShadowTool({
             "name": pageText.h1,
             "description": pageText.description,
             "inLanguage": locale === "default" ? "en" : locale,
-            "isPartOf": { "@type": "WebSite", "name": isHomeTool ? "CleanupPictures" : (process.env.NEXT_PUBLIC_DOMAIN_NAME || "CleanupPictures") }
+            "isPartOf": { "@type": "WebSite", "name": isHomeTool ? "Pic Cleaner" : (process.env.NEXT_PUBLIC_WEBSITE_NAME || "Pic Cleaner") }
           })}
         </Script>
         
@@ -1923,9 +2073,8 @@ export default function RemoveShadowTool({
                 <h1 className={`text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl ${isHomeTool ? 'max-w-4xl mx-auto leading-tight' : 'lg:whitespace-nowrap'}`}>
                   {isHomeTool ? (
                     <>
-                      <span className="whitespace-nowrap">Remove Objects, Text, People</span>
-                      <br className="hidden sm:block" />
-                      <span className="whitespace-nowrap">from Images Instantly</span>
+                      <span className="block">Remove Objects, Text, People</span>
+                      <span className="block">from Images Instantly</span>
                     </>
                   ) : pageText.h1}
                 </h1>
@@ -2003,7 +2152,7 @@ export default function RemoveShadowTool({
                        <div className="mt-5">
                          <p className="text-center text-sm text-slate-500 mb-3">No image? Try one of these</p>
                          <div className="flex items-center justify-center gap-3 flex-wrap">
-                           {SAMPLES.slice(0, 4).map((sample) => (
+                          {HOME_UPLOAD_THUMBNAILS.map((sample) => (
                              <button key={sample.id} onClick={() => loadSample(sample)} className="group rounded-xl border border-slate-200 bg-white p-1.5 hover:border-primary-300 hover:shadow-md transition-all">
                                <img src={sample.beforeUrl} alt={sample.title} className="w-24 h-16 object-cover rounded-lg" />
                              </button>
@@ -2020,7 +2169,12 @@ export default function RemoveShadowTool({
                     <div className="flex items-center gap-4 flex-wrap">
                        <button
                          onClick={handleNewImage}
-                         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 font-medium px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                        disabled={blockExitClick}
+                        className={`inline-flex items-center gap-2 font-medium px-3 py-2 rounded-lg transition-colors ${
+                          blockExitClick
+                            ? 'text-slate-400 cursor-not-allowed pointer-events-none'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
                        >
                          <ChevronLeftIcon className="w-5 h-5" />
                         <span>Exit Editor</span>
@@ -2250,7 +2404,10 @@ export default function RemoveShadowTool({
                         <p className="break-words text-xs leading-relaxed text-slate-600">{modeHelperText}</p>
                       </div>
                     </aside>
-                   <div onWheel={showReference ? undefined : handleWheelZoom} className={`flex-1 relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${showReference ? 'cursor-default' : (panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair')}`}>
+                   <div
+                     onWheel={showReference ? undefined : handleWheelZoom}
+                     className={`flex-1 relative flex items-center justify-center p-4 lg:p-8 overflow-hidden bg-slate-50 ${showReference ? 'cursor-default' : (panMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair')}`}
+                   >
                       <div
                         className="relative inline-block shadow-2xl rounded-lg overflow-hidden ring-1 ring-slate-900/5 transition-transform duration-75 ease-linear origin-center will-change-transform"
                         style={{ transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }}

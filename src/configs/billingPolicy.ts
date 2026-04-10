@@ -10,7 +10,7 @@ type RawOffer = {
 const MONTHLY_SUBSCRIPTION: RawOffer = {
   priceId: 'price_starter_monthly',
   checkoutType: 'recurring',
-  priceDisplay: '$7.9',
+  priceDisplay: '$9.9',
   credits: 120
 };
 
@@ -18,13 +18,13 @@ const CREDIT_PACKS: RawOffer[] = [
   {
     priceId: 'price_credit_100',
     checkoutType: 'one_time',
-    priceDisplay: '$5',
+    priceDisplay: '$5.9',
     credits: 50
   },
   {
     priceId: 'price_credit_500',
     checkoutType: 'one_time',
-    priceDisplay: '$10',
+    priceDisplay: '$11.9',
     credits: 120
   }
 ];

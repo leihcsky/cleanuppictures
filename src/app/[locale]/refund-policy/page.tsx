@@ -66,6 +66,7 @@ export default async function RefundPolicyPage({ params: { locale } }) {
               <ul className="mt-3 space-y-2 text-slate-700 leading-7 list-disc pl-5">
                 <li>You can cancel subscription renewal at any time from your billing portal.</li>
                 <li>Cancellation stops future charges and does not retroactively refund prior billing periods.</li>
+                <li>Subscription-included credits are valid only for the current billing period and expire at period end (no rollover).</li>
                 <li>If charged due to a verified billing error, we will investigate and issue refunds when applicable.</li>
               </ul>
             </section>
@@ -73,8 +74,8 @@ export default async function RefundPolicyPage({ params: { locale } }) {
             <section className="mt-8">
               <h2 className="text-xl font-semibold text-slate-900">4. Failed Processing and Billing Errors</h2>
               <p className="mt-3 text-slate-700 leading-7">
-                If a processing request fails and credits were incorrectly deducted, we will correct the deduction or provide an equivalent credit adjustment
-                after verification.
+                Failed processing is not billed. If a processing request fails and credits were incorrectly deducted due to a verified system-side issue,
+                we will correct the deduction or provide an equivalent credit adjustment after verification.
               </p>
             </section>
 

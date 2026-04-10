@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -50,27 +50,28 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}/remove-text-from-images` : `/${locale}/remove-text-from-images`;
   const homeModeHref = `${getLinkHref(locale, '')}?mode=text`;
+  const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
-      title: "Product image label cleanup",
-      desc: "Remove printed labels, promo text, and stickers from product photos for cleaner listings.",
-      note: "Ideal for ecommerce images where extra labels distract from the product itself.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
+      title: "Apparel — remove printed words on clothing",
+      desc: "Erase slogans, brand lines, or small print on shirts and jackets so the outfit photo looks cleaner.",
+      note: "Great for lookbooks, resale listings, and social posts where you want the garment without distracting lettering.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-after.jpg")
     },
     {
-      title: "Sign and text removal in street photos",
-      desc: "Erase signs, numbers, and distracting text in travel or street images while keeping scene continuity.",
-      note: "Useful for travel and street scenes when signs or numbers pull focus from the subject.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
+      title: "Facades — remove house or door numbers",
+      desc: "Take numbers or name plaques off doors and walls when you need a neutral exterior shot.",
+      note: "Useful for privacy, generic stock-style shots, or cleaner real-estate and neighborhood visuals.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-after.jpg")
     },
     {
-      title: "Watermark and overlay cleanup",
-      desc: "Remove text overlays and watermark-style marks from photos when you need a cleaner visual output.",
-      note: "Great for reused marketing visuals that need cleaner backgrounds before republishing.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
+      title: "Travel photos — remove on-image text",
+      desc: "Clean captions, stickers, or small signs from scenic shots while keeping the landscape natural.",
+      note: "Handy for albums, blogs, and prints where you want the scene without extra typography.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample3-remove-text-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample3-remove-text-after.jpg")
     }
   ];
   const faqItems = [
@@ -80,7 +81,7 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
     },
     {
       q: "What kind of text can I remove?",
-      a: "You can remove labels, captions, logos, signs, numbers, and watermark-like overlays."
+      a: "You can remove print on clothing, house or door numbers, travel captions and small signs, plus logos and watermark-like overlays."
     },
     {
       q: "How do I get better results around text edges?",
@@ -104,7 +105,7 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Remove Text from Images Online",
-      "description": "Remove text from images online with AI for product photos, travel scenes, and social media visuals.",
+      "description": "Remove text from images online with AI for clothing prints, door numbers, and travel photo overlays.",
       "url": pageUrl,
       "inLanguage": locale
     },
@@ -115,12 +116,12 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
       "applicationCategory": "PhotographyApplication",
       "operatingSystem": "Web",
       "url": pageUrl,
-      "description": "AI tool to erase text from images while preserving natural background details.",
+      "description": "AI tool to remove text on clothes, façades, and travel images with natural inpainting.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "featureList": [
         "Remove text from images online",
-        "Erase captions labels and watermarks",
-        "Brush-based local cleanup steps",
+        "Clothing prints, door numbers, travel text cleanup",
+        "Brush-based local cleanup",
         "JPG PNG WebP export"
       ]
     },
@@ -151,10 +152,10 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
         <div className="mx-auto max-w-6xl px-6 py-12 lg:py-16">
           <h1 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight">Remove Text from Images Online</h1>
           <p className="mt-4 text-lg text-slate-600 max-w-3xl">
-            Remove unwanted text from images in seconds with AI. Clean up labels, captions, watermarks, and logos while keeping natural texture and composition.
+            Remove unwanted text from images in seconds with AI—printing on clothes, numbers on doors, captions on travel shots, and more—while keeping fabrics, walls, and scenery looking natural.
           </p>
           <p className="mt-3 text-slate-600 max-w-3xl">
-            Great for ecommerce photos, social visuals, travel shots, and marketing assets that need a cleaner final look.
+            Ideal for fashion and resale photos, exterior and listing visuals, and travel content when typography gets in the way.
           </p>
 
           <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -162,11 +163,19 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg" alt="Before remove text" className="w-full h-56 object-cover rounded-xl" />
+                  <img
+                    src={cases[0].beforeUrl}
+                    alt="Before remove text"
+                    className="w-full h-56 object-contain object-center bg-slate-100 rounded-xl"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg" alt="After remove text" className="w-full h-56 object-cover rounded-xl" />
+                  <img
+                    src={cases[0].afterUrl}
+                    alt="After remove text"
+                    className="w-full h-56 object-contain object-center bg-slate-100 rounded-xl"
+                  />
                 </div>
               </div>
             </div>
@@ -184,7 +193,7 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 2</p>
                 <h3 className="mt-2 font-semibold text-slate-900">Brush the text area</h3>
-                <p className="mt-2 text-sm text-slate-600">Paint over text, labels, or logos and include a small border around each element.</p>
+                <p className="mt-2 text-sm text-slate-600">Paint over words on fabric, plaques, signs, or overlays and leave a thin margin around each block of text.</p>
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
                 <p className="text-sm font-semibold text-primary-700">Step 3</p>
@@ -199,14 +208,14 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Quick text cleanup</h3><p className="mt-2 text-sm text-slate-600">Remove distracting text without complicated manual retouching.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Natural background fill</h3><p className="mt-2 text-sm text-slate-600">AI rebuilds nearby textures to keep cleaned areas visually consistent.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works across use cases</h3><p className="mt-2 text-sm text-slate-600">Use it for product photos, social creatives, travel images, and promotional assets.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">From wardrobe to wanderlust</h3><p className="mt-2 text-sm text-slate-600">Fashion shots, building façades, and vacation frames—one workflow for local text cleanup.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Online and easy to use</h3><p className="mt-2 text-sm text-slate-600">No software install needed. Upload, brush, remove, and download in one flow.</p></div>
             </div>
           </section>
 
           <section className="mt-14">
             <h2 className="text-3xl font-bold text-slate-900">Use cases and results</h2>
-            <p className="mt-3 text-slate-600">See how text removal helps clean up different kinds of image content.</p>
+            <p className="mt-3 text-slate-600">See before and after examples for clothing, door numbers, and travel scenes.</p>
             <div className="mt-7 space-y-8">
               {cases.map((item) => (
                 <article key={item.title} className="rounded-3xl border border-slate-200 bg-white p-6 lg:p-8 shadow-sm">
@@ -222,8 +231,16 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <img src={item.beforeUrl} alt={`${item.title} before`} className="w-full h-48 object-cover rounded-xl" />
-                      <img src={item.afterUrl} alt={`${item.title} after`} className="w-full h-48 object-cover rounded-xl" />
+                      <img
+                        src={item.beforeUrl}
+                        alt={`${item.title} before`}
+                        className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl"
+                      />
+                      <img
+                        src={item.afterUrl}
+                        alt={`${item.title} after`}
+                        className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl"
+                      />
                     </div>
                   </div>
                 </article>

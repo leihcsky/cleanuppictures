@@ -2,17 +2,21 @@
 
 import { useRef, type ChangeEvent } from "react";
 import { ArrowUpOnSquareIcon } from "@heroicons/react/24/outline";
+import { getLinkHref, hrefWithSearchParams, getImageProxyHref } from "~/configs/buildLink";
+import { saveUploadBlob } from "~/lib/uploadRedirectBridge";
+import { useToolLandingNavigation } from "~/lib/useToolLandingNavigation";
 
 export default function UploadRedirectCard({ locale }) {
+  const pushToolHome = useToolLandingNavigation(locale);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const sampleUrls = [
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg'
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-before.jpg',
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-before.jpg',
+    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample3-remove-text-before.jpg'
   ];
 
   const gotoHome = () => {
-    window.location.href = `/${locale}?mode=text`;
+    pushToolHome(hrefWithSearchParams(getLinkHref(locale, ''), { mode: 'text' }));
   };
 
   const handleUploadClick = () => {
@@ -21,28 +25,32 @@ export default function UploadRedirectCard({ locale }) {
     fileInputRef.current.click();
   };
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      if (!dataUrl) return;
-      sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({ type: 'data', value: dataUrl }));
+    try {
+      const token = `pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await saveUploadBlob(token, file);
+      sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({
+        type: 'idb',
+        value: token,
+        name: file.name || 'upload',
+        mime: file.type || 'image/png'
+      }));
       gotoHome();
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.error('Failed to persist upload before redirect:', e);
+      alert('Upload is too large for temporary storage. Please use the tool page directly to upload this image.');
+    }
   };
 
   const onInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (file) handleFile(file);
+    if (file) void handleFile(file);
   };
 
-  const loadSample = (url: string) => {
-    const proxied = `/${locale}/api/image-proxy?url=${encodeURIComponent(url)}`;
-    sessionStorage.setItem('cleanup_pending_upload', JSON.stringify({ type: 'url', value: proxied }));
-    gotoHome();
+  const loadSample = (remoteUrl: string) => {
+    pushToolHome(hrefWithSearchParams(getLinkHref(locale, ''), { mode: 'text', sample: remoteUrl }));
   };
 
   return (
@@ -56,7 +64,11 @@ export default function UploadRedirectCard({ locale }) {
       <div className="mt-4 flex items-center justify-center gap-3 flex-wrap">
         {sampleUrls.map((url, idx) => (
           <button key={idx} onClick={() => loadSample(url)} className="rounded-xl border border-slate-200 bg-white p-1.5 hover:border-primary-300 hover:shadow-md transition-all">
-            <img src={url} alt={`Sample ${idx + 1}`} className="w-24 h-16 object-cover rounded-lg" />
+            <img
+              src={getImageProxyHref(locale, url)}
+              alt={`Sample ${idx + 1}`}
+              className="w-24 h-16 object-contain object-center bg-slate-100 rounded-lg"
+            />
           </button>
         ))}
       </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -50,6 +50,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
   const homeModeHref = `${getLinkHref(locale, '')}?mode=shadow`;
+  const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
       title: "Portrait shadow cleanup",
@@ -66,11 +67,11 @@ export default function RemoveShadowPage({ params: { locale } }) {
       afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
     },
     {
-      title: "Document and interior cleanup",
-      desc: "Reduce dark shadow regions in documents, walls, or room corners for clearer presentation photos.",
-      note: "Great for interiors and document shots where dark corners make the image look dull.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
+      title: "Traffic sign shadow cleanup",
+      desc: "Reduce strong cast shadows on road signs and reflective panels so symbols, text, and colors stay readable in street and documentation photos.",
+      note: "Best when poles, nearby objects, or low sun leave uneven shadows across the sign face.",
+      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
+      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
     }
   ];
   const faqItems = [
@@ -86,7 +87,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Remove Shadow from Photo Online",
-      "description": "Remove shadow from photos online with AI for portraits, ecommerce, and interior photography.",
+      "description": "Remove shadow from photos online with AI for portraits, ecommerce, street signs, and interior photography.",
       "url": pageUrl,
       "inLanguage": locale
     },
@@ -136,7 +137,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
             Remove harsh shadows from photos in seconds with AI. Fix uneven lighting while keeping natural texture and clean visual balance.
           </p>
           <p className="mt-3 text-slate-600 max-w-3xl">
-            Great for portraits, ecommerce product photos, and interior images where shadows reduce clarity.
+            Great for portraits, ecommerce product photos, traffic signs in street scenes, and interior images where shadows reduce clarity.
           </p>
 
           <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -144,11 +145,11 @@ export default function RemoveShadowPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg" alt="Before remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg")} alt="Before remove shadow" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png" alt="After remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png")} alt="After remove shadow" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>
@@ -181,14 +182,14 @@ export default function RemoveShadowPage({ params: { locale } }) {
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Fast shadow correction</h3><p className="mt-2 text-sm text-slate-600">Clean up harsh shadows quickly without complicated manual retouching.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Natural lighting balance</h3><p className="mt-2 text-sm text-slate-600">AI reconstructs nearby regions to keep transitions smooth and realistic.</p></div>
-              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works for many scenarios</h3><p className="mt-2 text-sm text-slate-600">Useful for portraits, product photos, room photos, and marketing images.</p></div>
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Works for many scenarios</h3><p className="mt-2 text-sm text-slate-600">Useful for portraits, product photos, traffic signs, room photos, and marketing images.</p></div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5"><h3 className="font-semibold text-slate-900">Online and easy to use</h3><p className="mt-2 text-sm text-slate-600">No software installation needed. Edit and export directly in your browser.</p></div>
             </div>
           </section>
 
           <section className="mt-14">
             <h2 className="text-3xl font-bold text-slate-900">Use cases and results</h2>
-            <p className="mt-3 text-slate-600">See how shadow removal improves clarity across different photo types.</p>
+            <p className="mt-3 text-slate-600">See how shadow removal improves clarity for people, products, street signage, and more.</p>
             <div className="mt-7 space-y-8">
               {cases.map((item) => (
                 <article key={item.title} className="rounded-3xl border border-slate-200 bg-white p-6 lg:p-8 shadow-sm">
@@ -204,8 +205,8 @@ export default function RemoveShadowPage({ params: { locale } }) {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <img src={item.beforeUrl} alt={`${item.title} before`} className="w-full h-48 object-cover rounded-xl" />
-                      <img src={item.afterUrl} alt={`${item.title} after`} className="w-full h-48 object-cover rounded-xl" />
+                      <img src={px(item.beforeUrl)} alt={`${item.title} before`} className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl" />
+                      <img src={px(item.afterUrl)} alt={`${item.title} after`} className="w-full h-48 object-contain object-center bg-slate-100 rounded-xl" />
                     </div>
                   </div>
                 </article>

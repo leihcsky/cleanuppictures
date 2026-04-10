@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -50,27 +50,28 @@ export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}/object-remover-for-photos` : `/${locale}/object-remover-for-photos`;
   const homeModeHref = `${getLinkHref(locale, '')}?mode=object`;
+  const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
-      title: "Street and travel cleanup",
-      desc: "Remove traffic signs, bins, and random objects that distract from landmarks and scenery.",
-      note: "Ideal for travel photos where background clutter pulls attention away from the destination.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
+      title: "Group shots — remove one subject",
+      desc: "Erase a single person or animal from a group while keeping the rest of the scene natural.",
+      note: "Works well when you want a cleaner group photo without re-shooting.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-after.jpg")
     },
     {
-      title: "Product photo cleanup",
-      desc: "Erase tags, extra props, reflections, and defects to keep product images clean and conversion-ready.",
-      note: "Useful for ecommerce listings that need cleaner visuals and stronger product focus.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
+      title: "Interior scenes — remove small clutter",
+      desc: "Take out objects like a tissue box on a table so the room feels tidier in the frame.",
+      note: "Useful for lifestyle, rental, and social photos where you want less visual noise.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-after.jpg")
     },
     {
-      title: "Property listing cleanup",
-      desc: "Remove cables, trash bins, and small visual clutter from interior or exterior real-estate photos.",
-      note: "Great for listing photos where cleaner scenes help rooms and facades look more premium.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-building-after.jpg"
+      title: "E-commerce — remove price tags and labels",
+      desc: "Clean product shots by removing stickers, tags, and small labels that distract buyers.",
+      note: "Helps listings look more polished without a full reshoot.",
+      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-before.jpg"),
+      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-after.jpg")
     }
   ];
   const faqItems = [
@@ -104,7 +105,7 @@ export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "WebPage",
       "name": "Object Remover for Photos Online",
-      "description": "Remove unwanted objects from photos online with AI for travel, ecommerce, and property listing cleanup.",
+      "description": "Remove unwanted objects from photos online with AI for group shots, interiors, and ecommerce product cleanup.",
       "url": pageUrl,
       "inLanguage": locale
     },
@@ -162,11 +163,11 @@ export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg" alt="Before remove object" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={cases[0].beforeUrl} alt="Before remove object" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg" alt="After remove object" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={cases[0].afterUrl} alt="After remove object" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>

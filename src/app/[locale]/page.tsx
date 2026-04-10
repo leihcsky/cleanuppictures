@@ -1,13 +1,14 @@
 import RemoveShadowTool from "~/components/RemoveShadowTool";
+import { isHttpsUrlAllowedForSampleProxy } from "~/lib/sampleImageAllowlist";
 
 export const revalidate = 120;
 export async function generateMetadata({ params: { locale = '' } }) {
   const { setRequestLocale } = await import('next-intl/server');
   setRequestLocale(locale);
-  const brand = 'CleanupPictures';
+  const brand = 'Pic Cleaner';
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const title = `AI Image Cleanup Tool | Object Remover for Photos Online - ${brand}`;
+  const title = "AI Image Cleanup Tool | Object Remover for Photos Online";
   const description = "Remove unwanted objects and distractions from photos online in a few clicks. Upload, brush the area, and download clean results in JPG, PNG, or WebP.";
   const canonicalUrl = origin ? `${origin}/${locale}` : `/${locale}`;
     return {
@@ -63,14 +64,14 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     useCasesDesc: "• **Photographers**: remove tourists, wires, distractions.\n• **Creative Agencies**: clean assets for campaigns and social.\n• **Real Estate**: tidy room photos for better presentation.\n• **E-commerce**: remove defects, labels, or reflections.",
     sampleTitle: "Before / After Examples",
     sampleDesc: "Try real examples and see how the tool handles objects, people, emoji/text overlays, and shadows.",
-    sample1Title: "Portrait background cleanup",
-    sample1Desc: "Remove people and distracting objects behind your subject for a cleaner portrait composition.",
-    sample2Title: "E-commerce image cleanup",
-    sample2Desc: "Erase labels, props, and visual clutter so product photos look cleaner and more professional.",
-    sample3Title: "Real estate photo cleanup",
-    sample3Desc: "Remove bins, wires, and small distractions to improve room and property presentation.",
-    sample4Title: "General object removal",
-    sample4Desc: "Clean up unwanted objects, signs, and marks from everyday photos while keeping natural details.",
+    sample1Title: "Content Creators: Clean Text in Shots",
+    sample1Desc: "Remove door numbers and unwanted text overlays so reels, shorts, and thumbnails look cleaner and more focused.",
+    sample2Title: "Marketing Teams: Product Visual Cleanup",
+    sample2Desc: "Erase price tags and distracting labels to deliver campaign-ready product images with a cleaner brand look.",
+    sample3Title: "Real Estate Teams: Room Detail Cleanup",
+    sample3Desc: "Remove small interior distractions like tissue boxes and clutter to keep listing photos neat and professional.",
+    sample4Title: "Ecommerce Sellers: Remove Emoji/Sticker Marks",
+    sample4Desc: "Clean sticker or emoji marks from product photos to keep catalog images consistent, clear, and conversion-friendly.",
     faq1Q: "What can this AI cleanup tool remove?",
     faq1A: "You can remove people, objects, text overlays, shadows, glare and other distractions by painting over the area.",
     faq2Q: "Do I need Photoshop skills?",
@@ -99,7 +100,17 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
   const initialMode = ['object', 'person', 'text', 'shadow', 'glare'].includes(String(modeRaw || '').toLowerCase())
     ? String(modeRaw).toLowerCase()
     : 'object';
-  const brand = 'CleanupPictures';
+  const sampleRaw = Array.isArray(searchParams?.sample) ? searchParams.sample[0] : searchParams?.sample;
+  let initialLandingSampleUrl: string | null = null;
+  if (typeof sampleRaw === 'string' && sampleRaw.trim()) {
+    try {
+      const candidate = decodeURIComponent(sampleRaw.trim());
+      if (isHttpsUrlAllowedForSampleProxy(candidate)) initialLandingSampleUrl = candidate;
+    } catch {
+      /* ignore malformed sample param */
+    }
+  }
+  const brand = 'Pic Cleaner';
   const origin =
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}` : `/${locale}`;
@@ -156,6 +167,7 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
         pageText={pageText}
         toolText={toolText}
         initialMode={initialMode}
+        initialLandingSampleUrl={initialLandingSampleUrl}
       />
     </>
   )

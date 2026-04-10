@@ -69,7 +69,8 @@ export default async function PrivacyPolicyPage({ params: { locale } }) {
               <h2 className="text-xl font-semibold text-slate-900">3. Payments</h2>
               <p className="mt-3 text-slate-700 leading-7">
                 We use third-party payment providers to process purchases. We do not store full card numbers on our servers. Payment providers may process
-                your billing data under their own privacy terms.
+                your billing data under their own privacy terms. Checkout prices shown by our platform include applicable taxes where required by law;
+                your card issuer may still apply separate currency-conversion or foreign-transaction fees.
               </p>
             </section>
 

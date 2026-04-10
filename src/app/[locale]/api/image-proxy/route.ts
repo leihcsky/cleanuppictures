@@ -26,11 +26,39 @@ export async function GET(req: Request) {
     return Response.json({ msg: "Host not allowed.", status: 403 }, { status: 403 });
   }
 
-  const upstream = await fetch(target.toString(), {
-    headers: {
-      Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+  const fetchUpstream = async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      return await fetch(target.toString(), {
+        headers: {
+          Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+        },
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
     }
-  });
+  };
+
+  let upstream: Response | null = null;
+  let lastErr: unknown = null;
+  const retries = [0, 250, 800];
+  for (const delay of retries) {
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    try {
+      upstream = await fetchUpstream();
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (!upstream) {
+    console.error("image-proxy upstream fetch failed:", lastErr);
+    return Response.json({ msg: "Image source temporarily unavailable. Please retry.", status: 502 }, { status: 502 });
+  }
   if (!upstream.ok) {
     return Response.json({ msg: "Failed to fetch image.", status: upstream.status }, { status: upstream.status });
   }

@@ -66,7 +66,10 @@ export default async function TermsOfServicePage({ params: { locale } }) {
                 <li>Free plans include limited usage and may have quality or speed restrictions.</li>
                 <li>Paid subscriptions renew automatically unless canceled before renewal.</li>
                 <li>Credit purchases may be offered as one-time top-ups and are consumed by successful processing actions.</li>
-                <li>Taxes, currency conversion, and processor fees may apply depending on your payment method and jurisdiction.</li>
+                <li>Displayed checkout prices are final for your order and include applicable taxes where required by law (no hidden fees).</li>
+                <li>Your card issuer or bank may still apply separate currency-conversion or foreign-transaction charges outside our control.</li>
+                <li>Subscription-included credits are valid only during the active billing period and do not roll over after the period ends.</li>
+                <li>Failed processing does not consume credits; if a verified system-side billing error occurs, we may restore equivalent credits or provide compensation.</li>
               </ul>
             </section>
 
