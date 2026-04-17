@@ -1,0 +1,37 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - master   # 改成你的分支（可能是 master）
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 2201   # 你的SSH端口
+          script: |
+            set -e
+
+            echo "🚀 Start Deploy"
+
+            cd /var/www/piccleaner
+
+            git fetch origin
+            git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+
+            npm install --production
+            npm run build || echo "no build"
+
+            pm2 reload piccleaner || pm2 start npm --name "piccleaner" -- start
+
+            pm2 save
+
+            echo "✅ Deploy Done"
