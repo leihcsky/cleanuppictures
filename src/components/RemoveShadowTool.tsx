@@ -1,6 +1,7 @@
 'use client'
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
+import LoginModal from "~/components/LoginModal";
 import { useCommonContext } from "~/context/common-context";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from "react";
 import Script from "next/script";
@@ -86,8 +87,9 @@ export default function RemoveShadowTool({
   initialMode = "object",
   initialLandingSampleUrl = null
 }) {
-  const { setShowLoadingModal, setShowLoginModal, userData } = useCommonContext();
+  const { setShowLoadingModal, setShowLoginModal, userData, commonText, authText } = useCommonContext();
   const isHomeTool = !pageName;
+  const pageResult = getLinkHref(locale, pageName || '');
   const normalizeMode = (value: string | null | undefined) => {
     const v = String(value || '').toLowerCase();
     if (v === 'shadow' || v === 'glare' || v === 'person' || v === 'text' || v === 'object') return v as 'shadow' | 'glare' | 'person' | 'text' | 'object';
@@ -197,7 +199,7 @@ export default function RemoveShadowTool({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/${locale}/api/user/getSubscriptionOverview?userId=${userData.user_id}`);
+        const res = await fetch(`/${locale}/api/user/getSubscriptionOverview`);
         const json = (await res.json()) as Record<string, unknown>;
         if (!cancelled) {
           setBillingOverview(json || {});
@@ -1209,6 +1211,7 @@ export default function RemoveShadowTool({
   const requestRemoveShadow = async (payload: any) => {
     const response = await fetch(`/${locale}/api/${apiPath}`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
@@ -1868,32 +1871,44 @@ export default function RemoveShadowTool({
   const monthlySubscription = getMonthlySubscriptionOffer(locale);
   const creditPackOffers = getCreditPackOffers(locale);
   const checkoutFromUpgrade = async (priceId: string, checkoutType: 'recurring' | 'one_time') => {
-    if (!userData?.user_id) {
+    const { getSession } = await import('next-auth/react');
+    const session = await getSession();
+    const sessionUserId = Number((session?.user as any)?.user_id || 0);
+    if (!sessionUserId) {
       setShowUpgradeChoiceModal(false);
-      setShowLoginModal(true);
+      setTimeout(() => setShowLoginModal(true), 0);
       return;
     }
     setShowUpgradeChoiceModal(false);
     setCheckoutLoadingId(priceId);
     try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
+      const response = await fetch('/api/billing/create-checkout-session', {
         method: 'POST',
         headers: new Headers({ 'Content-Type': 'application/json' }),
         credentials: 'same-origin',
         body: JSON.stringify({
           price: { id: priceId, type: checkoutType },
           redirectUrl: typeof window !== 'undefined' ? window.location.pathname : getLinkHref(locale, pageName || ''),
-          user_id: userData.user_id
+          user_id: sessionUserId
         })
       });
       const res = await response.json();
-      if (res?.error || !res?.sessionId) {
+      if (res?.error) {
         setInfoMessage(res?.error?.message || res?.message || (locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.'));
         setShowInfoModal(true);
         return;
       }
-      const stripe = await getStripe();
-      await stripe?.redirectToCheckout({ sessionId: res.sessionId });
+      if (res?.provider === 'stripe' && res?.sessionId) {
+        const stripe = await getStripe();
+        await stripe?.redirectToCheckout({ sessionId: res.sessionId });
+        return;
+      }
+      if (res?.provider === 'creem' && res?.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      setInfoMessage(locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.');
+      setShowInfoModal(true);
     } catch (e) {
       setInfoMessage(locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.');
       setShowInfoModal(true);
@@ -1904,6 +1919,14 @@ export default function RemoveShadowTool({
 
   return (
     <>
+      {imageSrc && (
+        <LoginModal
+          loadingText={commonText?.loadingText || 'Loading...'}
+          redirectPath={pageResult}
+          loginModalDesc={authText?.loginModalDesc || 'Please login to continue.'}
+          loginModalButtonText={authText?.loginModalButtonText || 'Continue with Google'}
+        />
+      )}
       {showQuotaModal && (
         <Dialog as="div" className="relative z-[90]" open={showQuotaModal} onClose={setShowQuotaModal}>
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]" />

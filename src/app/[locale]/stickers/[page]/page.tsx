@@ -5,8 +5,15 @@ import { getCountSticker } from "~/servers/keyValue";
 
 export const revalidate = 300;
 export const dynamic = "force-static";
+function stickerFeatureEnabled() {
+  const raw = String(process.env.ENABLE_STICKER_PAGES || process.env.NEXT_PUBLIC_ENABLE_STICKER_PAGES || "").toLowerCase();
+  return raw === "1" || raw === "true";
+}
 
 export default async function IndexPage({ params: { locale = '', page = 2 } }) {
+  if (!stickerFeatureEnabled()) {
+    notFound();
+  }
   // Enable static rendering
   const { setRequestLocale } = await import('next-intl/server');
   setRequestLocale(locale);

@@ -1,9 +1,13 @@
 import { getReplicateClient } from "~/libs/replicateClient";
 import { getUserFacingAiErrorMessage, resolveAiErrorLocale } from "~/lib/aiErrorUserMessage";
-import { getDb } from "~/libs/db";
+import { getDb, tableExists, withDbTransaction, type DbClient } from "~/libs/db";
+import { GUEST_COOKIE_KEY, VISITOR_COOKIE_KEY, resolveApiUserContext } from "~/servers/visitorContext";
 import { getBusinessDateString } from "~/libs/date";
-import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
+import { uploadBufferToR2, getR2ConfigState } from "~/libs/R2";
+import { randomUUID } from "crypto";
+
+export const dynamic = "force-dynamic";
 
 // KIE API Configuration
 const KIE_UPLOAD_BASE_URL = "https://kieai.redpandaai.co";
@@ -46,7 +50,6 @@ interface KieTaskDetailsResponse {
   };
 }
 
-const GUEST_COOKIE_KEY = "cp_guest_user_id";
 const FREE_DAILY_LIMIT = Number(process.env.FREE_TIMES || 3);
 const FREE_DAILY_IP_LIMIT = Math.max(FREE_DAILY_LIMIT, Number(process.env.FREE_TIMES_IP || 6));
 const API_RATE_LIMIT_PER_MIN = Math.max(1, Number(process.env.API_RATE_LIMIT_PER_MIN || 12));
@@ -61,12 +64,15 @@ const ipMinuteBuckets = new Map<string, RateWindow>();
 
 type UserAccessContext = {
   userId: number;
+  limitUserId: number;
   isGuest: boolean;
   isSubscribed: boolean;
   creditBalance: number;
   isFreeTier: boolean;
   todayUsedCount: number;
   guestCookieValue?: string;
+  clearGuestCookie?: boolean;
+  visitorCookieValue?: string;
 };
 
 function getClientIp(req: NextRequest) {
@@ -141,8 +147,25 @@ async function resolveOutputUrl(output: any): Promise<string> {
   return String(candidate || "");
 }
 
-function buildResponse(payload: any, status: number, guestCookieValue?: string) {
+function buildResponse(
+  payload: any,
+  status: number,
+  guestCookieValue?: string,
+  clearGuestCookie?: boolean,
+  visitorCookieValue?: string
+) {
   const response = NextResponse.json(payload, { status });
+  if (clearGuestCookie) {
+    response.cookies.set({
+      name: GUEST_COOKIE_KEY,
+      value: "",
+      maxAge: 0,
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production"
+    });
+  }
   if (guestCookieValue) {
     response.cookies.set({
       name: GUEST_COOKIE_KEY,
@@ -154,53 +177,18 @@ function buildResponse(payload: any, status: number, guestCookieValue?: string) 
       maxAge: 60 * 60 * 24 * 365
     });
   }
+  if (visitorCookieValue) {
+    response.cookies.set({
+      name: VISITOR_COOKIE_KEY,
+      value: visitorCookieValue,
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365
+    });
+  }
   return response;
-}
-
-async function resolveUserContext(req: NextRequest) {
-  const db = getDb();
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const tokenUserId = Number(token?.user_id || 0);
-
-  if (tokenUserId > 0) {
-    const userRowRes = await db.query("select * from users where id=$1 limit 1", [tokenUserId]);
-    if (userRowRes.rows.length > 0) {
-      return {
-        userId: tokenUserId,
-        isGuest: false,
-        guestCookieValue: undefined
-      };
-    }
-  }
-
-  const cookieUserId = Number(req.cookies.get(GUEST_COOKIE_KEY)?.value || 0);
-  if (cookieUserId > 0) {
-    const guestRes = await db.query("select * from users where id=$1 limit 1", [cookieUserId]);
-    if (guestRes.rows.length > 0) {
-      return {
-        userId: cookieUserId,
-        isGuest: true,
-        guestCookieValue: String(cookieUserId)
-      };
-    }
-  }
-
-  const ip = getClientIp(req);
-  const guestName = `Guest_${Date.now()}`;
-  const insertRes = await db.query(
-    "insert into users(email,password_hash,user_name,user_image,is_guest,last_login_ip) values($1,$2,$3,$4,$5,$6)",
-    [null, null, guestName, null, true, ip]
-  );
-  let guestId = Number(insertRes.insertId || 0);
-  if (!guestId) {
-    const latestRes = await db.query("select id from users where is_guest=$1 order by id desc limit 1", [true]);
-    guestId = Number(latestRes.rows?.[0]?.id || 0);
-  }
-  return {
-    userId: guestId,
-    isGuest: true,
-    guestCookieValue: String(guestId)
-  };
 }
 
 async function ensureCreditsRow(userId: number) {
@@ -248,6 +236,119 @@ async function increaseTodayUsage(userId: number) {
   }
 }
 
+let hasConsumptionAllocationsTable: boolean | null = null;
+async function canWriteConsumptionAllocations() {
+  if (hasConsumptionAllocationsTable == null) {
+    hasConsumptionAllocationsTable = await tableExists("credit_consumption_allocations");
+  }
+  return hasConsumptionAllocationsTable;
+}
+
+async function insertCreditTransaction(
+  tx: DbClient,
+  userId: number,
+  amount: number,
+  type: string,
+  referenceId: number
+) {
+  await tx.query(
+    "insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)",
+    [userId, amount, type, referenceId]
+  );
+  const latest = await tx.query(
+    "select id from credit_transactions where user_id=$1 and type=$2 and reference_id=$3 order by id desc limit 1",
+    [userId, type, referenceId]
+  );
+  return Number(latest.rows?.[0]?.id || 0);
+}
+
+async function deductCreditsWithFifoBuckets(args: {
+  userId: number;
+  creditCost: number;
+  jobId: number;
+  quality: "standard" | "high_quality";
+  isHd: boolean;
+}) {
+  if (args.creditCost <= 0) return;
+  const writeAlloc = await canWriteConsumptionAllocations();
+  await withDbTransaction(async (tx) => {
+    let remainingToDeduct = args.creditCost;
+    const bucketsRes = await tx.query(
+      "select id,remaining_credits from credit_buckets where user_id=$1 and remaining_credits>0 and status in ($2,$3) order by id asc",
+      [args.userId, "active", "depleted"]
+    );
+    const allocations: Array<{ bucketId: number; amount: number }> = [];
+    for (const row of bucketsRes.rows || []) {
+      if (remainingToDeduct <= 0) break;
+      const bucketId = Number(row.id || 0);
+      const bucketRemain = Number(row.remaining_credits || 0);
+      if (bucketId <= 0 || bucketRemain <= 0) continue;
+      const take = Math.min(bucketRemain, remainingToDeduct);
+      const nextRemain = bucketRemain - take;
+      await tx.query(
+        "update credit_buckets set remaining_credits=$1,status=$2,updated_at=now() where id=$3",
+        [nextRemain, nextRemain <= 0 ? "depleted" : "active", bucketId]
+      );
+      allocations.push({ bucketId, amount: take });
+      remainingToDeduct -= take;
+    }
+    if (remainingToDeduct > 0) {
+      throw new Error("Credit bucket remaining_credits is insufficient");
+    }
+
+    await tx.query("update credits set balance=balance-$1,updated_at=now() where user_id=$2", [args.creditCost, args.userId]);
+
+    if (args.quality === "high_quality") {
+      const txId = await insertCreditTransaction(tx, args.userId, -args.creditCost, "consume_pro", args.jobId);
+      if (writeAlloc && txId > 0) {
+        for (const a of allocations) {
+          await tx.query(
+            "insert into credit_consumption_allocations(credit_transaction_id,bucket_id,amount) values($1,$2,$3)",
+            [txId, a.bucketId, a.amount]
+          );
+        }
+      }
+      return;
+    }
+
+    const standardTxId = await insertCreditTransaction(tx, args.userId, -1, "consume_standard", args.jobId);
+    if (writeAlloc && standardTxId > 0) {
+      let left = 1;
+      for (const a of allocations) {
+        if (left <= 0) break;
+        const n = Math.min(left, a.amount);
+        if (n > 0) {
+          await tx.query(
+            "insert into credit_consumption_allocations(credit_transaction_id,bucket_id,amount) values($1,$2,$3)",
+            [standardTxId, a.bucketId, n]
+          );
+          left -= n;
+        }
+      }
+    }
+
+    if (args.isHd) {
+      const hdTxId = await insertCreditTransaction(tx, args.userId, -1, "consume_hd", args.jobId);
+      if (writeAlloc && hdTxId > 0) {
+        let left = 1;
+        let skip = 1; // first 1 credit already attributed to consume_standard
+        for (const a of allocations) {
+          if (left <= 0) break;
+          const available = Math.max(0, a.amount - skip);
+          skip = Math.max(0, skip - a.amount);
+          if (available <= 0) continue;
+          const n = Math.min(left, available);
+          await tx.query(
+            "insert into credit_consumption_allocations(credit_transaction_id,bucket_id,amount) values($1,$2,$3)",
+            [hdTxId, a.bucketId, n]
+          );
+          left -= n;
+        }
+      }
+    }
+  });
+}
+
 async function uploadToKie(base64Data: string, apiKey: string): Promise<string> {
   // Use the Base64 upload endpoint
   const url = `${KIE_UPLOAD_BASE_URL}/api/file-base64-upload`;
@@ -285,6 +386,44 @@ async function uploadToKie(base64Data: string, apiKey: string): Promise<string> 
   }
 
   return fileUrl;
+}
+
+async function persistResultImageToR2(remoteUrl: string, jobId: number) {
+  if (!remoteUrl) return remoteUrl;
+  try {
+    const resp = await fetch(remoteUrl);
+    if (!resp.ok) return remoteUrl;
+    const contentType = resp.headers.get("content-type") || "image/png";
+    const ext =
+      contentType.includes("jpeg") || contentType.includes("jpg")
+        ? "jpg"
+        : contentType.includes("webp")
+          ? "webp"
+          : contentType.includes("gif")
+            ? "gif"
+            : "png";
+    const arr = await resp.arrayBuffer();
+    const body = Buffer.from(arr);
+    const key = `results/${new Date().toISOString().slice(0, 10).replace(/-/g, "")}/job_${jobId}_${randomUUID()}.${ext}`;
+    return await uploadBufferToR2({
+      key,
+      body,
+      contentType
+    });
+  } catch (e) {
+    // Fail-open: keep upstream URL when R2 is not configured or upload fails.
+    const cfg = getR2ConfigState();
+    console.error("R2 persist failed, fallback to source URL:", {
+      jobId,
+      remoteUrl,
+      error: String(e),
+      r2Enabled: cfg.enabled,
+      bucket: cfg.bucket,
+      endpoint: cfg.endpoint,
+      storageDomain: cfg.storageDomain
+    });
+    return remoteUrl;
+  }
 }
 
 async function generate4oImage(
@@ -398,6 +537,8 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   let jobId = 0;
   let guestCookieValue: string | undefined;
+  let clearGuestCookie = false;
+  let visitorCookieValue: string | undefined;
   let localeHint: unknown;
   const clientIp = getClientIp(req);
   const rateLimit = isIpRateLimited(clientIp);
@@ -431,29 +572,35 @@ export async function POST(req: NextRequest) {
       return buildResponse({ msg: "Mask is required for this model. Please paint over the area to remove.", status: 400 }, 400);
     }
 
-    const userContextBase = await resolveUserContext(req);
+    const userContextBase = await resolveApiUserContext(req);
     guestCookieValue = userContextBase.guestCookieValue;
+    clearGuestCookie = Boolean(userContextBase.clearGuestCookie);
+    visitorCookieValue = userContextBase.visitorCookieValue;
     const subscriptionRes = await db.query("select * from subscriptions where user_id=$1 order by id desc limit 1", [userContextBase.userId]);
     const subStatus = String(subscriptionRes.rows?.[0]?.status || "");
     const isSubscribed = subStatus === "active";
     const creditBalance = await ensureCreditsRow(userContextBase.userId);
-    const usage = await getTodayUsage(userContextBase.userId);
+    const limitUserId = Number(userContextBase.limitUserId || userContextBase.userId);
+    const usage = await getTodayUsage(limitUserId);
     const isFreeTier = !isSubscribed && creditBalance <= 0;
 
     const userContext: UserAccessContext = {
       userId: userContextBase.userId,
+      limitUserId,
       isGuest: userContextBase.isGuest,
       isSubscribed,
       creditBalance,
       isFreeTier,
       todayUsedCount: usage.usedCount,
-      guestCookieValue
+      guestCookieValue,
+      clearGuestCookie: userContextBase.clearGuestCookie ?? false,
+      visitorCookieValue: userContextBase.visitorCookieValue
     };
     creditCost = upscaleOnly ? (userContext.isSubscribed ? 0 : 1) : getCreditCost(quality, isHd, userContext.isSubscribed);
 
     if (userContext.isFreeTier) {
       if (upscaleOnly || quality !== "standard" || isHd) {
-        return buildResponse({ msg: "Free users support Standard mode only.", status: 602 }, 200, guestCookieValue);
+        return buildResponse({ msg: "Free users support Standard mode only.", status: 602 }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
       }
       if (userContext.isGuest) {
         const ipUsedCount = await getTodayGuestUsageByIp(clientIp);
@@ -461,15 +608,17 @@ export async function POST(req: NextRequest) {
           return buildResponse(
             { msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 },
             200,
-            guestCookieValue
+            userContext.guestCookieValue,
+            userContext.clearGuestCookie,
+            userContext.visitorCookieValue
           );
         }
       }
       if (userContext.todayUsedCount >= FREE_DAILY_LIMIT) {
-        return buildResponse({ msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 }, 200, guestCookieValue);
+        return buildResponse({ msg: "You’ve reached your free limit. Upgrade to continue.", status: 602 }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
       }
     } else if (userContext.creditBalance < creditCost) {
-      return buildResponse({ msg: "Not enough credits. Buy more to continue.", status: 602 }, 200, guestCookieValue);
+      return buildResponse({ msg: "Not enough credits. Buy more to continue.", status: 602 }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
     }
 
     const kieApiKey = process.env.KIE_API_KEY;
@@ -487,7 +636,7 @@ export async function POST(req: NextRequest) {
         maskUrl = await uploadToKie(maskToUse, kieApiKey);
       }
       const outputUrl = await generate4oImage(kieApiKey, imageUrl, maskUrl, prompt, scene);
-      return buildResponse({ output_url: outputUrl }, 200, guestCookieValue);
+      return buildResponse({ output_url: outputUrl }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
     }
 
     const model = process.env.REPLICATE_SHADOW_MODEL_RUN || "stability-ai/stable-diffusion-inpainting:95b7223104132402a9ae91cc677285bc5eb997834bd2349fa486f53910fd68b3";
@@ -540,7 +689,7 @@ export async function POST(req: NextRequest) {
           need_client_resize: true,
           maxSide: lamaMaxSide,
           status: 200
-        }, 200, guestCookieValue);
+        }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
       }
       modelToRun = process.env.REPLICATE_SHADOW_MODEL_RUN_LAMA || "allenhooo/lama";
       input = { image: imageDataUrl, mask: maskInput };
@@ -551,7 +700,9 @@ export async function POST(req: NextRequest) {
           return buildResponse(
             { need_client_resize: true, maxSide: sdMaxSide, status: 200 },
             200,
-            guestCookieValue
+            userContext.guestCookieValue,
+            userContext.clearGuestCookie,
+            userContext.visitorCookieValue
           );
         }
       }
@@ -561,7 +712,7 @@ export async function POST(req: NextRequest) {
     if (selectedVariant !== "sd_inpaint" && !modelToRun.includes(":")) {
       const token = process.env.REPLICATE_API_TOKEN;
       if (!token) {
-        return buildResponse({ msg: "Missing REPLICATE_API_TOKEN.", status: 500 }, 500, guestCookieValue);
+        return buildResponse({ msg: "Missing REPLICATE_API_TOKEN.", status: 500 }, 500, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
       }
       try {
         const modelInfoRes = await fetch(`https://api.replicate.com/v1/models/${modelToRun}`, {
@@ -640,28 +791,36 @@ export async function POST(req: NextRequest) {
       if (!hdOutputUrl) {
         throw new Error("HD upscale returned empty output.");
       }
+      const storedHdUrl = await persistResultImageToR2(hdOutputUrl, jobId);
       await db.query("insert into results(job_id,image_url,resolution) values($1,$2,$3)", [
         jobId,
-        hdOutputUrl,
+        storedHdUrl,
         "hd"
       ]);
       await db.query("update jobs set status=$1,updated_at=now() where id=$2", ["success", jobId]);
       if (creditCost > 0) {
-        await db.query("update credits set balance=balance-$1,updated_at=now() where user_id=$2", [creditCost, userContext.userId]);
+        await deductCreditsWithFifoBuckets({
+          userId: userContext.userId,
+          creditCost,
+          jobId,
+          quality: "high_quality",
+          isHd: true
+        });
+      } else {
+        await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
+          userContext.userId,
+          -creditCost,
+          "consume_hd_pro",
+          jobId
+        ]);
       }
-      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
-        userContext.userId,
-        -creditCost,
-        creditCost > 0 ? "consume_hd" : "consume_hd_pro",
-        jobId
-      ]);
       const creditsAfterRes = await db.query("select balance from credits where user_id=$1 limit 1", [userContext.userId]);
       const creditsAfter = Number(creditsAfterRes.rows?.[0]?.balance || 0);
       return buildResponse({
-        output_url: hdOutputUrl,
+        output_url: storedHdUrl,
         credits_remaining: creditsAfter,
         free_remaining: 0
-      }, 200, guestCookieValue);
+      }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
     }
 
     let output;
@@ -706,7 +865,7 @@ export async function POST(req: NextRequest) {
           msg: "LaMa model slug not found. Set REPLICATE_SHADOW_MODEL_RUN_LAMA to a versioned id like owner/model:version.",
           error: String(runErr),
           status: 500
-        }, 500, guestCookieValue);
+        }, 500, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
       }
       if (isLamaOom && allowLamaOomFallback) {
         output = await runReplicateWithRetry(sdInput);
@@ -738,61 +897,45 @@ export async function POST(req: NextRequest) {
       finalOutputUrl = enhancedUrl;
     }
 
+    const storedResultUrl = await persistResultImageToR2(finalOutputUrl, jobId);
     await db.query("insert into results(job_id,image_url,resolution) values($1,$2,$3)", [
       jobId,
-      finalOutputUrl,
+      storedResultUrl,
       isHd || quality === "high_quality" ? "hd" : "standard"
     ]);
     await db.query("update jobs set status=$1,updated_at=now() where id=$2", ["success", jobId]);
 
     if (userContext.isFreeTier) {
-      await increaseTodayUsage(userContext.userId);
+      await increaseTodayUsage(userContext.limitUserId);
       await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
         userContext.userId,
         0,
         "free_daily",
         jobId
       ]);
-      const usageAfter = await getTodayUsage(userContext.userId);
+      const usageAfter = await getTodayUsage(userContext.limitUserId);
       return buildResponse({
-        output_url: finalOutputUrl,
+        output_url: storedResultUrl,
         credits_remaining: 0,
         free_remaining: Math.max(0, FREE_DAILY_LIMIT - usageAfter.usedCount)
-      }, 200, guestCookieValue);
+      }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
     }
 
-    await db.query("update credits set balance=balance-$1,updated_at=now() where user_id=$2", [creditCost, userContext.userId]);
-    if (quality === "high_quality") {
-      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
-        userContext.userId,
-        -creditCost,
-        "consume_pro",
-        jobId
-      ]);
-    } else {
-      await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
-        userContext.userId,
-        -1,
-        "consume_standard",
-        jobId
-      ]);
-      if (isHd) {
-        await db.query("insert into credit_transactions(user_id,amount,type,reference_id) values($1,$2,$3,$4)", [
-          userContext.userId,
-          -1,
-          "consume_hd",
-          jobId
-        ]);
-      }
-    }
+    await deductCreditsWithFifoBuckets({
+      userId: userContext.userId,
+      creditCost,
+      jobId,
+      quality,
+      isHd
+    });
 
     const creditsAfterRes = await db.query("select balance from credits where user_id=$1 limit 1", [userContext.userId]);
     const creditsAfter = Number(creditsAfterRes.rows?.[0]?.balance || 0);
     return buildResponse({
-      output_url: finalOutputUrl,
+      output_url: storedResultUrl,
       credits_remaining: creditsAfter,
       free_remaining: 0
-    }, 200, guestCookieValue);
+    }, 200, userContext.guestCookieValue, userContext.clearGuestCookie, userContext.visitorCookieValue);
   } catch (err) {
     if (jobId > 0) {
       try {
@@ -804,6 +947,6 @@ export async function POST(req: NextRequest) {
     console.error("AI refine failed:", err);
     const loc = resolveAiErrorLocale(localeHint);
     const userMsg = getUserFacingAiErrorMessage(String(err), loc);
-    return buildResponse({ msg: userMsg, status: 500 }, 500, guestCookieValue);
+    return buildResponse({ msg: userMsg, status: 500 }, 500, guestCookieValue, clearGuestCookie, visitorCookieValue);
   }
 }

@@ -1,11 +1,19 @@
 import { getDb } from "~/libs/db";
 import { getBusinessDateString } from "~/libs/date";
+import { getToken } from "next-auth/jwt";
+import { NextRequest } from "next/server";
+import { getUserByEmail } from "~/servers/user";
 
 export const revalidate = 0;
+export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
-  const query = new URL(req.url).searchParams;
-  const userId = Number(query.get("userId") || 0);
+export async function GET(req: NextRequest) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  let userId = Number((token as any)?.user_id || 0);
+  if (!userId && (token as any)?.email) {
+    const row = await getUserByEmail(String((token as any).email));
+    userId = Number(row?.user_id || 0);
+  }
   const freeTimes = Number(process.env.FREE_TIMES || 3);
   const today = getBusinessDateString();
 

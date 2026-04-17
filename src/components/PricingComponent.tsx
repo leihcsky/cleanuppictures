@@ -22,19 +22,21 @@ export default function Pricing({
   
   const {
     setShowLoginModal,
-    userData,
     pricingText
   } = useCommonContext();
   const isZh = locale === 'zh';
 
   const handleCheckout = async (priceId: string, type: 'recurring' | 'one_time') => {
     setPriceIdLoading(priceId);
-    if (!userData || !userData.user_id) {
-      setShowLoginModal(true);
+    const { getSession } = await import('next-auth/react');
+    const session = await getSession();
+    const sessionUserId = Number((session?.user as any)?.user_id || 0);
+    if (!sessionUserId) {
+      setTimeout(() => setShowLoginModal(true), 0);
       setPriceIdLoading(undefined);
       return;
     }
-    const user_id = userData.user_id;
+    const user_id = sessionUserId;
     try {
       const price = { id: priceId, type }; 
       
@@ -43,7 +45,7 @@ export default function Pricing({
         redirectUrl,
         user_id
       };
-      const url = `/api/stripe/create-checkout-session`;
+      const url = `/api/billing/create-checkout-session`;
       const response = await fetch(url, {
         method: 'POST',
         headers: new Headers({'Content-Type': 'application/json'}),
@@ -55,9 +57,16 @@ export default function Pricing({
           alert(res.error);
           return;
       }
-      const sessionId = res.sessionId;
-      const stripe = await getStripe();
-      stripe?.redirectToCheckout({sessionId});
+      if (res.provider === 'stripe' && res.sessionId) {
+        const stripe = await getStripe();
+        await stripe?.redirectToCheckout({ sessionId: res.sessionId });
+        return;
+      }
+      if (res.provider === 'creem' && res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      alert(locale === 'zh' ? '支付会话创建失败，请稍后重试。' : 'Failed to create checkout session. Please try again.');
     } catch (error) {
       return alert((error as Error)?.message);
     } finally {
@@ -84,23 +93,6 @@ export default function Pricing({
       isPopular: false,
     },
     {
-      kind: 'paygo',
-      id: 'paygo',
-      title: pricingText.payGoTitle,
-      price: locale === 'zh' ? `低至 ${creditPackOffers[0]?.priceDisplay || '$5'}` : `From ${creditPackOffers[0]?.priceDisplay || '$5'}`,
-      period: '',
-      description: isZh ? '按需付费，灵活使用不过期。' : 'Flexible pay-per-use with no expiry.',
-      features: [
-        isZh ? '按使用付费，不浪费预算' : 'Pay only for what you use',
-        isZh ? '标准模式与高质量模式均可使用' : 'Standard and High Quality included',
-        isZh ? 'HD 下载已包含' : 'HD downloads included',
-        isZh ? '额度永久有效' : 'Balance never expires',
-      ],
-      buttonText: pricingText.payGoBtn,
-      buttonAction: () => handleCheckout(creditPackOffers[0]?.priceId || 'price_credit_100', 'one_time'),
-      isPopular: true,
-    },
-    {
       kind: 'pro',
       id: monthlySubscription.priceId,
       title: pricingText.proTitle,
@@ -118,6 +110,23 @@ export default function Pricing({
       ],
       buttonText: pricingText.proBtn,
       buttonAction: () => handleCheckout(monthlySubscription.priceId, 'recurring'),
+      isPopular: true,
+    },
+    {
+      kind: 'paygo',
+      id: 'paygo',
+      title: pricingText.payGoTitle,
+      price: locale === 'zh' ? `低至 ${creditPackOffers[0]?.priceDisplay || '$5'}` : `From ${creditPackOffers[0]?.priceDisplay || '$5'}`,
+      period: '',
+      description: isZh ? '按需付费，灵活使用不过期。' : 'Flexible pay-per-use with no expiry.',
+      features: [
+        isZh ? '按使用付费，不浪费预算' : 'Pay only for what you use',
+        isZh ? '标准模式与高质量模式均可使用' : 'Standard and High Quality included',
+        isZh ? 'HD 下载已包含' : 'HD downloads included',
+        isZh ? '额度永久有效' : 'Balance never expires',
+      ],
+      buttonText: pricingText.payGoBtn,
+      buttonAction: () => handleCheckout(creditPackOffers[0]?.priceId || 'price_credit_100', 'one_time'),
       isPopular: false,
     },
   ];

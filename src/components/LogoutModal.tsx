@@ -10,10 +10,11 @@ export default function LogoutModal({
                                     }) {
 
   const cancelButtonRef = useRef(null);
-  const {showLogoutModal, setShowLogoutModal} = useCommonContext();
+  const {showLogoutModal, setShowLogoutModal, setUserData} = useCommonContext();
 
   const confirmButton = () => {
     sessionStorage.removeItem("user_id");
+    setUserData({});
     import('next-auth/react').then(({ signOut }) => {
       signOut({callbackUrl: redirectPath}).then(r => console.log(r))
     })

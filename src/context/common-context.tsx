@@ -13,7 +13,7 @@ export const CommonProvider = ({
                                }) => {
 
   const [userData, setUserData] = useState({});
-  const [intervalUserData, setIntervalUserData] = useState(1000);
+  const [intervalUserData] = useState(3000);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
@@ -42,7 +42,8 @@ export const CommonProvider = ({
         }
         setUserData(user);
         setShowLoginModal(false);
-        setIntervalUserData(undefined);
+      } else {
+        setUserData({});
       }
     } catch (e) {
       // ignore

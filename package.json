@@ -6,9 +6,11 @@
     "dev": "next dev --port 80",
     "build": "next build",
     "start": "next start",
-    "db:init:mysql": "node scripts/init-mysql.mjs"
+    "db:init:mysql": "node scripts/init-mysql.mjs",
+    "r2:migrate-results": "node scripts/migrate-results-to-r2.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1030.0",
     "@headlessui/react": "^1.7.18",
     "@heroicons/react": "^2.1.1",
     "@next/third-parties": "^14.2.25",
@@ -16,6 +18,7 @@
     "@tailwindcss/typography": "^0.5.10",
     "ahooks": "^3.7.10",
     "clsx": "^2.1.0",
+    "creem_io": "^1.0.0",
     "date-fns": "^3.3.1",
     "google-auth-library": "^9.6.3",
     "mysql2": "^3.20.0",

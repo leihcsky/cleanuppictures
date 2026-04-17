@@ -51,7 +51,7 @@ export default function Header({
         return;
       }
       try {
-        const response = await fetch(`/api/user/getSubscriptionOverview?userId=${userData.user_id}`);
+        const response = await fetch(`/${locale}/api/user/getSubscriptionOverview`);
         const json = await response.json();
         setOverview(json || {});
       } catch (e) {
@@ -63,7 +63,7 @@ export default function Header({
       }
     };
     fetchOverview();
-  }, [userData?.user_id]);
+  }, [userData?.user_id, locale]);
 
   const checkLocalAndLoading = (lang) => {
     setMobileMenuOpen(false);
