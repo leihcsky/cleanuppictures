@@ -1,12 +1,12 @@
 import RemoveShadowTool from "~/components/RemoveShadowTool";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
   const languageModule = await import('~/i18n/languageText');
   const pageText = await languageModule.getRemoveGlarePageText();
   const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/remove-glare` : `/${locale}/remove-glare`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "remove-glare");
 
   return {
     title: pageText.title,

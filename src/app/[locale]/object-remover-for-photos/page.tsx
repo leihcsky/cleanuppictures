@@ -3,13 +3,13 @@ import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import { publicCdnUrl } from "~/libs/cdnPublic";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
   const brand = 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/object-remover-for-photos` : `/${locale}/object-remover-for-photos`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "object-remover-for-photos");
   const title = "Object Remover for Photos Online | AI Object Remover";
   const description = "Remove unwanted objects from photos online with AI. Fast cleanup with natural results and JPG, PNG, WebP export.";
   return {
@@ -47,9 +47,9 @@ export async function generateMetadata({ params: { locale } }) {
 
 export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
   const brand = 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const pageUrl = origin ? `${origin}/${locale}/object-remover-for-photos` : `/${locale}/object-remover-for-photos`;
+  const origin = getPublicSiteOriginNoSlash();
+  const pageUrl = absoluteCanonicalUrl(origin, locale, "object-remover-for-photos");
+  const homeCanonicalUrl = absoluteCanonicalUrl(origin, locale, "");
   const homeModeHref = `${getLinkHref(locale, '')}?mode=object`;
   const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
@@ -139,7 +139,7 @@ export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": brand, "item": origin ? `${origin}/${locale}` : `/${locale}` },
+        { "@type": "ListItem", "position": 1, "name": brand, "item": homeCanonicalUrl },
         { "@type": "ListItem", "position": 2, "name": "Object Remover for Photos", "item": pageUrl }
       ]
     }

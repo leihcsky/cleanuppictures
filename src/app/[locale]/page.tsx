@@ -1,16 +1,16 @@
 import RemoveShadowTool from "~/components/RemoveShadowTool";
 import { isHttpsUrlAllowedForSampleProxy } from "~/lib/sampleImageAllowlist";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export const revalidate = 120;
 export async function generateMetadata({ params: { locale = '' } }) {
   const { setRequestLocale } = await import('next-intl/server');
   setRequestLocale(locale);
   const brand = 'Pic Cleaner';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
+  const origin = getPublicSiteOriginNoSlash();
   const title = "AI Image Cleanup Tool | Object Remover for Photos Online";
   const description = "Remove unwanted objects and distractions from photos online in a few clicks. Upload, brush the area, and download clean results in JPG, PNG, or WebP.";
-  const canonicalUrl = origin ? `${origin}/${locale}` : `/${locale}`;
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "");
     return {
       title,
       description,
@@ -111,9 +111,8 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     }
   }
   const brand = 'Pic Cleaner';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const pageUrl = origin ? `${origin}/${locale}` : `/${locale}`;
+  const origin = getPublicSiteOriginNoSlash();
+  const pageUrl = absoluteCanonicalUrl(origin, locale, "");
   const faqData = [
     { q: pageText.faq1Q, a: pageText.faq1A },
     { q: pageText.faq2Q, a: pageText.faq2A },

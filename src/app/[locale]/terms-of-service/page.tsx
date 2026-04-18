@@ -1,10 +1,10 @@
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/terms-of-service` : `/${locale}/terms-of-service`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "terms-of-service");
   const title = "Terms of Service | Pic Cleaner";
   const description = "Read the terms governing your use of Pic Cleaner services, subscriptions, credits, and acceptable use.";
   return {

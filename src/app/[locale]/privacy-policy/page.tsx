@@ -1,10 +1,10 @@
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/privacy-policy` : `/${locale}/privacy-policy`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "privacy-policy");
   const title = "Privacy Policy | Pic Cleaner";
   const description = "Read how Pic Cleaner collects, uses, stores, and protects your data when you use our AI image cleanup services.";
   return {

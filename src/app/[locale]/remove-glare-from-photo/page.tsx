@@ -2,12 +2,12 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref } from "~/configs/buildLink";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
   const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/remove-glare-from-photo` : `/${locale}/remove-glare-from-photo`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "remove-glare-from-photo");
   const title = "Remove Glare from Photo Online | AI Glare Remover";
   const description = "Remove glare from photos online with AI. Fix shiny hotspots fast and export clean results as JPG, PNG, or WebP.";
   return {

@@ -3,13 +3,13 @@ import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import { publicCdnUrl } from "~/libs/cdnPublic";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
   const brand = 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "remove-shadow");
   const title = "Remove Shadow from Photo Online | AI Shadow Remover";
   const description = "Remove shadow from photo online with AI. Fix harsh shadows fast and export clean results as JPG, PNG, or WebP.";
   return {
@@ -47,9 +47,9 @@ export async function generateMetadata({ params: { locale } }) {
 
 export default function RemoveShadowPage({ params: { locale } }) {
   const brand = 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const pageUrl = origin ? `${origin}/${locale}/remove-shadow` : `/${locale}/remove-shadow`;
+  const origin = getPublicSiteOriginNoSlash();
+  const pageUrl = absoluteCanonicalUrl(origin, locale, "remove-shadow");
+  const homeCanonicalUrl = absoluteCanonicalUrl(origin, locale, "");
   const homeModeHref = `${getLinkHref(locale, '')}?mode=shadow`;
   const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
@@ -121,7 +121,7 @@ export default function RemoveShadowPage({ params: { locale } }) {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": brand, "item": origin ? `${origin}/${locale}` : `/${locale}` },
+        { "@type": "ListItem", "position": 1, "name": brand, "item": homeCanonicalUrl },
         { "@type": "ListItem", "position": 2, "name": "Remove Shadow from Photo", "item": pageUrl }
       ]
     }

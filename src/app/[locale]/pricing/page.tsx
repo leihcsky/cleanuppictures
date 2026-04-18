@@ -1,9 +1,9 @@
 import PageComponent from "./PageComponent";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/pricing` : `/${locale}/pricing`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "pricing");
   const title = "Pricing Plans | Free, Pro, and Pay-as-you-go Credits";
   const description = "Choose the best plan for AI image cleanup: Free trial, Pro subscription, or pay-as-you-go credits. Start free and upgrade when you need HD and advanced AI.";
 

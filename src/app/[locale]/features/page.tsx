@@ -2,12 +2,12 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref } from "~/configs/buildLink";
+import { absoluteCanonicalUrl, getPublicSiteOriginNoSlash } from "~/libs/seoCanonical";
 
 export async function generateMetadata({ params: { locale } }) {
   const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || 'CleanupPictures';
-  const origin =
-    (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
-  const canonicalUrl = origin ? `${origin}/${locale}/features` : `/${locale}/features`;
+  const origin = getPublicSiteOriginNoSlash();
+  const canonicalUrl = absoluteCanonicalUrl(origin, locale, "features");
   const title = "AI Image Cleanup Features | Object, Text, People, Shadow";
   const description = "Explore detailed AI image cleanup modules for object, text, people, emoji, and shadow removal. Each feature includes examples and direct tool links.";
   return {
