@@ -27,8 +27,10 @@ jobs:
             git fetch origin
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
 
-            npm install --production
-            npm run build || echo "no build"
+            # Full install (not --production): next build needs devDependencies
+            # (typescript, tailwindcss, postcss, autoprefixer, eslint-config-next, …).
+            npm install
+            npm run build
 
             pm2 reload piccleaner || pm2 start npm --name "piccleaner" -- start
 
