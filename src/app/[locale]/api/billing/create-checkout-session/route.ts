@@ -6,6 +6,12 @@ import { stripe } from "~/libs/stripe";
 import { createOrRetrieveCustomer } from "~/libs/handle-stripe";
 import Stripe from "stripe";
 import { createOrderNo } from "~/servers/creemBilling";
+import { isActiveSubscriptionStatus } from "~/libs/subscriptionStatus";
+
+async function userHasActiveSubscription(db: ReturnType<typeof getDb>, userId: number): Promise<boolean> {
+  const subRes = await db.query("select status from subscriptions where user_id=$1 order by id desc limit 1", [userId]);
+  return isActiveSubscriptionStatus(subRes.rows?.[0]?.status);
+}
 
 function getLocaleFromPath(redirectUrl?: string) {
   const p = String(redirectUrl || "").replace(/^\//, "");
@@ -37,6 +43,20 @@ export async function POST(req: Request) {
     let localOrderId = 0;
     try {
       const mapped = getCreditsByProductId(String(price.id));
+      if (!mapped) {
+        return Response.json({ error: { message: "Unknown product" } }, { status: 400 });
+      }
+      if (mapped.kind === "pro" && (await userHasActiveSubscription(db, userId))) {
+        return Response.json(
+          {
+            error: {
+              message:
+                "You already have an active subscription. Use My account to manage billing, or buy a credit pack to top up."
+            }
+          },
+          { status: 409 }
+        );
+      }
       const orderNo = createOrderNo();
       const amountUsd = Number(String(price?.amount || 0)) || 0;
       await db.query(
@@ -89,6 +109,17 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (price.type === "recurring" && (await userHasActiveSubscription(db, userId))) {
+      return Response.json(
+        {
+          error: {
+            message:
+              "You already have an active subscription. Use My account to manage billing, or buy a credit pack to top up."
+          }
+        },
+        { status: 409 }
+      );
+    }
     const customer = await createOrRetrieveCustomer({
       user_id: String(userId),
       email: String(userInfo.email || "")

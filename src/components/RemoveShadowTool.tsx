@@ -13,6 +13,7 @@ import { Dialog, Menu, Transition } from "@headlessui/react";
 import ComparisonSlider from "./ComparisonSlider";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/billingPolicy";
+import { isActiveSubscriptionStatus } from "~/libs/subscriptionStatus";
 import { getStripe } from "~/libs/stripeClient";
 import { publicCdnUrl } from "~/libs/cdnPublic";
 
@@ -61,7 +62,7 @@ type BillingSegment = "visitor" | "free" | "credits" | "pro";
 
 function resolveBillingSegment(loggedIn: boolean, subscriptionStatus: string, creditsBalance: number): BillingSegment {
   if (!loggedIn) return "visitor";
-  if (subscriptionStatus === "active") return "pro";
+  if (subscriptionStatus === "active" || subscriptionStatus === "trialing") return "pro";
   if (creditsBalance > 0) return "credits";
   return "free";
 }
@@ -220,7 +221,8 @@ export default function RemoveShadowTool({
 
   const loggedIn = Boolean(userData?.user_id);
   const subStatus = String(billingOverview?.subscription_status ?? "");
-  const isProBilling = subStatus === "active";
+  const isProBilling = isActiveSubscriptionStatus(subStatus);
+  const alreadySubscribed = loggedIn && !billingOverviewLoading && Boolean(billingOverview?.subscribed);
   const creditsBal = Number(billingOverview?.credits_balance ?? 0);
   const freeRemaining = Number(billingOverview?.free_remaining ?? 0);
   const billingSegment = resolveBillingSegment(loggedIn, subStatus, creditsBal);
@@ -1977,25 +1979,64 @@ export default function RemoveShadowTool({
                   {locale === 'zh' ? '升级与购买' : 'Upgrade Options'}
                 </Dialog.Title>
                 <p className="mt-2 text-sm text-slate-600">
-                  {locale === 'zh' ? '选择一个订阅计划或积分包，继续使用去除功能。' : 'Pick a subscription plan or a credit pack to continue editing.'}
+                  {alreadySubscribed
+                    ? locale === "zh"
+                      ? "你已有订阅：可购买积分包加码度，或在账户页管理账单。"
+                      : "You already have a subscription: buy a credit pack for more credits, or manage billing in My account."
+                    : locale === "zh"
+                      ? "选择一个订阅计划或积分包，继续使用去除功能。"
+                      : "Pick a subscription plan or a credit pack to continue editing."}
                 </p>
                 <div className="mt-4 space-y-3">
-                  <button
-                    onClick={() => {
-                      checkoutFromUpgrade(monthlySubscription.priceId, monthlySubscription.checkoutType);
-                    }}
-                    disabled={Boolean(checkoutLoadingId)}
-                    className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-800 hover:bg-slate-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <CreditCardIcon className="h-5 w-5 text-primary-600" />
-                      <div>
-                        <p className="text-sm font-semibold">{monthlySubscription.title}</p>
-                        <p className="text-xs text-slate-500">{monthlySubscription.summary}</p>
+                  {alreadySubscribed ? (
+                    <div className="flex w-full flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-left">
+                      <div className="flex items-start gap-3">
+                        <CreditCardIcon className="h-5 w-5 shrink-0 text-emerald-700" />
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {locale === "zh" ? "当前为订阅用户" : "You are on a monthly plan"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {locale === "zh"
+                              ? "无法重复开通相同订阅。需要更多额度请选下方积分包。"
+                              : "A second subscription checkout is not available. Use credit packs below for more balance."}
+                          </p>
+                        </div>
                       </div>
+                      <Link
+                        href={getLinkHref(locale, "my")}
+                        onClick={() => setShowUpgradeChoiceModal(false)}
+                        className="text-xs font-semibold text-primary-700 hover:text-primary-800"
+                      >
+                        {locale === "zh" ? "前往我的账户 →" : "Open My account →"}
+                      </Link>
                     </div>
-                    <span className="text-xs font-semibold text-primary-600">{checkoutLoadingId === monthlySubscription.priceId ? (locale === 'zh' ? '跳转中...' : 'Redirecting...') : (locale === 'zh' ? '订阅' : 'Subscribe')}</span>
-                  </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        checkoutFromUpgrade(monthlySubscription.priceId, monthlySubscription.checkoutType);
+                      }}
+                      disabled={Boolean(checkoutLoadingId) || (loggedIn && billingOverviewLoading)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <CreditCardIcon className="h-5 w-5 text-primary-600" />
+                        <div>
+                          <p className="text-sm font-semibold">{monthlySubscription.title}</p>
+                          <p className="text-xs text-slate-500">{monthlySubscription.summary}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-semibold text-primary-600">
+                        {checkoutLoadingId === monthlySubscription.priceId
+                          ? locale === "zh"
+                            ? "跳转中..."
+                            : "Redirecting..."
+                          : locale === "zh"
+                            ? "订阅"
+                            : "Subscribe"}
+                      </span>
+                    </button>
+                  )}
                   {creditPackOffers.map((offer) => (
                     <button
                       key={offer.priceId}

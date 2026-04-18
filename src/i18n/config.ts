@@ -1,15 +1,11 @@
-export const locales = ["en", "zh"] as const;
+/** Locales exposed in routing and `[locale]` layout. Re-add `"zh"` when Chinese copy is ready site-wide. */
+export const locales = ["en"] as const;
 
 export const languages = [
   {
     code: "en-US",
     lang: "en",
     language: "English",
-  },
-  {
-    code: "zh-CN",
-    lang: "zh",
-    language: "简体中文",
   },
 ];
 

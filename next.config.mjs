@@ -8,6 +8,8 @@ const nextConfig = {
     distDir: isDev ? '.next-dev' : '.next',
     async redirects() {
         return [
+            { source: '/zh', destination: '/', permanent: true },
+            { source: '/zh/:path*', destination: '/:path*', permanent: true },
             {source: '/en', destination: '/', permanent: true},
             {source: '/stickers/1', destination: '/stickers', permanent: true},
             {source: '/stickers/0', destination: '/stickers', permanent: true},

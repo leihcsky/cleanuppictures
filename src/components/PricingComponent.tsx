@@ -1,5 +1,5 @@
 import {getStripe} from '~/libs/stripeClient';
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {useCommonContext} from "~/context/common-context";
 import Link from "next/link";
 import { getLinkHref } from "~/configs/buildLink";
@@ -17,8 +17,32 @@ export default function Pricing({
                                   locale = 'en'
                                 }) {
   const [priceIdLoading, setPriceIdLoading] = useState<string>();
+  const [planSubscribed, setPlanSubscribed] = useState(false);
   const monthlySubscription = getMonthlySubscriptionOffer(locale);
   const creditPackOffers = getCreditPackOffers(locale);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { getSession } = await import("next-auth/react");
+      const session = await getSession();
+      const uid = Number((session?.user as any)?.user_id || 0);
+      if (!uid) {
+        if (!cancelled) setPlanSubscribed(false);
+        return;
+      }
+      try {
+        const res = await fetch(`/${locale}/api/user/getSubscriptionOverview`, { credentials: "same-origin" });
+        const json = (await res.json()) as { subscribed?: boolean };
+        if (!cancelled) setPlanSubscribed(Boolean(json?.subscribed));
+      } catch {
+        if (!cancelled) setPlanSubscribed(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
   
   const {
     setShowLoginModal,
@@ -54,8 +78,16 @@ export default function Pricing({
       });
       const res = await response.json();
       if (res.error) {
-          alert(res.error);
-          return;
+        const msg =
+          typeof res.error === "string"
+            ? res.error
+            : typeof res.error?.message === "string"
+              ? res.error.message
+              : locale === "zh"
+                ? "无法创建支付会话"
+                : "Could not start checkout";
+        alert(msg);
+        return;
       }
       if (res.provider === 'stripe' && res.sessionId) {
         const stripe = await getStripe();
@@ -172,7 +204,7 @@ export default function Pricing({
       },
       {
         q: '为什么我看不到某些支付方式？',
-        a: '可用支付方式由 Stripe 和你的地区决定。若当前方式不可用，建议更换卡种或地区后重试。'
+        a: '结账由 Creem 处理，具体可用的支付方式取决于 Creem、发卡行/支付机构以及你所在地区。若当前方式不可用，可尝试换一张卡或其他支付选项。'
       }
     ]
     : [
@@ -210,7 +242,7 @@ export default function Pricing({
       },
       {
         q: 'Why are some payment methods unavailable?',
-        a: 'Available payment methods are determined by Stripe and your region. If one method is unavailable, try another card or payment option.'
+        a: 'Checkout is processed through Creem. Which payment methods you see depends on Creem, your card issuer or payment provider, and your region. If an option is unavailable, try another card or payment method.'
       }
     ];
 
@@ -296,17 +328,32 @@ export default function Pricing({
               )}
 
               {plan.kind !== 'paygo' && (
-                <button
-                  onClick={plan.buttonAction}
-                  disabled={!!priceIdLoading}
-                  className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                    plan.isPopular
-                      ? 'bg-blue-600 text-white hover:bg-blue-500 focus-visible:outline-blue-600'
-                      : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900'
-                  } ${priceIdLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                >
-                  {priceIdLoading === plan.id ? 'Processing...' : plan.buttonText}
-                </button>
+                <>
+                  <button
+                    onClick={plan.buttonAction}
+                    disabled={!!priceIdLoading || (plan.kind === "pro" && planSubscribed)}
+                    className={`w-full rounded-lg px-4 py-2.5 text-center text-sm font-semibold shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                      plan.isPopular
+                        ? 'bg-blue-600 text-white hover:bg-blue-500 focus-visible:outline-blue-600'
+                        : 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900'
+                    } ${priceIdLoading || (plan.kind === "pro" && planSubscribed) ? "opacity-70 cursor-not-allowed" : ""}`}
+                  >
+                    {priceIdLoading === plan.id
+                      ? "Processing..."
+                      : plan.kind === "pro" && planSubscribed
+                        ? isZh
+                          ? "当前套餐"
+                          : "Current plan"
+                        : plan.buttonText}
+                  </button>
+                  {plan.kind === "pro" && planSubscribed && (
+                    <p className="mt-2 text-center text-xs text-slate-500">
+                      <Link href={getLinkHref(locale, "my")} className="font-medium text-blue-700 hover:text-blue-800">
+                        {isZh ? "管理订阅与账单 →" : "Manage subscription & billing →"}
+                      </Link>
+                    </p>
+                  )}
+                </>
               )}
             </div>
           ))}

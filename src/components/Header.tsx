@@ -149,49 +149,59 @@ export default function Header({
           </Link>
         </div>
         <div className="hidden lg:flex lg:items-center lg:gap-4">
-          <Menu as="div" className="relative inline-block text-left z-30">
-            <div>
-              <Menu.Button
-                className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-base font-medium text-slate-700 hover:bg-white transition-all shadow-sm">
-                <GlobeAltIcon className="w-5 h-5 text-slate-500" />{locale == 'default' ? 'EN' : locale.toUpperCase()}
-                <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-500" aria-hidden="true" />
-              </Menu.Button>
-            </div>
-            <Transition
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
+          {languages.length > 1 ? (
+            <Menu as="div" className="relative inline-block text-left z-30">
+              <div>
+                <Menu.Button
+                  className="inline-flex w-full justify-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-base font-medium text-slate-700 hover:bg-white transition-all shadow-sm">
+                  <GlobeAltIcon className="w-5 h-5 text-slate-500" />{locale == 'default' ? 'EN' : locale.toUpperCase()}
+                  <ChevronDownIcon className="-mr-1 h-5 w-5 text-slate-500" aria-hidden="true" />
+                </Menu.Button>
+              </div>
+              <Transition
+                as={Fragment}
+                enter="transition ease-out duration-100"
+                enterFrom="transform opacity-0 scale-95"
+                enterTo="transform opacity-100 scale-100"
+                leave="transition ease-in duration-75"
+                leaveFrom="transform opacity-100 scale-100"
+                leaveTo="transform opacity-0 scale-95"
+              >
+                <Menu.Items
+                  className="absolute right-0 z-30 mt-2 w-26 origin-top-right divide-y divide-gray-100 rounded-xl bg-white/80 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="py-1 z-30">
+                    {
+                      languages.map((item) => {
+                        let hrefValue = `/${item.lang}`;
+                        if (page) {
+                          hrefValue = `/${item.lang}/${page}`;
+                        }
+                        return (
+                          <Menu.Item key={item.lang}>
+                            <Link href={hrefValue} onClick={() => checkLocalAndLoading(item.lang)} className={"z-30"}>
+                              <span
+                                className={'text-slate-700 block px-4 py-2 text-sm hover:text-primary-600 hover:bg-primary-50 z-30 transition-colors'}
+                              >
+                                {item.language}
+                              </span>
+                            </Link>
+                          </Menu.Item>
+                        )
+                      })
+                    }
+                  </div>
+                </Menu.Items>
+              </Transition>
+            </Menu>
+          ) : (
+            <span
+              className="inline-flex items-center gap-x-1.5 border border-white/50 bg-white/50 rounded-lg px-3 py-2 text-base font-medium text-slate-700 shadow-sm"
+              title="English"
             >
-              <Menu.Items
-                className="absolute right-0 z-30 mt-2 w-26 origin-top-right divide-y divide-gray-100 rounded-xl bg-white/80 backdrop-blur-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                <div className="py-1 z-30">
-                  {
-                    languages.map((item) => {
-                      let hrefValue = `/${item.lang}`;
-                      if (page) {
-                        hrefValue = `/${item.lang}/${page}`;
-                      }
-                      return (
-                        <Menu.Item key={item.lang}>
-                          <Link href={hrefValue} onClick={() => checkLocalAndLoading(item.lang)} className={"z-30"}>
-                            <span
-                              className={'text-slate-700 block px-4 py-2 text-sm hover:text-primary-600 hover:bg-primary-50 z-30 transition-colors'}
-                            >
-                              {item.language}
-                            </span>
-                          </Link>
-                        </Menu.Item>
-                      )
-                    })
-                  }
-                </div>
-              </Menu.Items>
-            </Transition>
-          </Menu>
+              <GlobeAltIcon className="w-5 h-5 text-slate-500" aria-hidden="true" />
+              EN
+            </span>
+          )}
           
           {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
             isLoggedIn ? (
