@@ -2,6 +2,7 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -56,22 +57,22 @@ export default function RemoveTextFromImagesPage({ params: { locale } }) {
       title: "Apparel — remove printed words on clothing",
       desc: "Erase slogans, brand lines, or small print on shirts and jackets so the outfit photo looks cleaner.",
       note: "Great for lookbooks, resale listings, and social posts where you want the garment without distracting lettering.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-text/sample1-remove-text-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-text/sample1-remove-text-after.jpg"))
     },
     {
       title: "Facades — remove house or door numbers",
       desc: "Take numbers or name plaques off doors and walls when you need a neutral exterior shot.",
       note: "Useful for privacy, generic stock-style shots, or cleaner real-estate and neighborhood visuals.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-text/sample2-remove-text-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-text/sample2-remove-text-after.jpg"))
     },
     {
       title: "Travel photos — remove on-image text",
       desc: "Clean captions, stickers, or small signs from scenic shots while keeping the landscape natural.",
       note: "Handy for albums, blogs, and prints where you want the scene without extra typography.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample3-remove-text-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample3-remove-text-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-text/sample3-remove-text-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-text/sample3-remove-text-after.jpg"))
     }
   ];
   const faqItems = [

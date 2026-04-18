@@ -6,7 +6,7 @@ export function isHttpsUrlAllowedForSampleProxy(urlStr: string): boolean {
   try {
     const target = new URL(urlStr.trim());
     if (target.protocol !== "https:") return false;
-    const allowlist = (process.env.SAMPLE_IMAGE_PROXY_ALLOWLIST || "r2.dev")
+    const allowlist = (process.env.SAMPLE_IMAGE_PROXY_ALLOWLIST || "r2.dev,cleanuppictures.org")
       .split(",")
       .map((v) => v.trim().toLowerCase())
       .filter(Boolean);

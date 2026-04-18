@@ -10,8 +10,7 @@ import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import { HandRaisedIcon } from "@heroicons/react/24/solid";
 import { QuestionMarkCircleIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowPathIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import ComparisonSlider from "./ComparisonSlider";
-
-
+import { publicCdnUrl } from "~/libs/cdnPublic";
 
 
 // Helper: Calculate color distance
@@ -168,9 +167,9 @@ export default function RemoveColorTool({
       id: 'bird',
       title: pageText.sample1Title || 'Bird Background Removal',
       desc: pageText.sample1Desc || 'Automatically remove the blue sky background to isolate the bird.',
-      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
-      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-result.png',
-      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
+      beforeUrl: publicCdnUrl("removecolor/bird-original.jpg"),
+      afterUrl: publicCdnUrl("removecolor/bird-result.png"),
+      url: publicCdnUrl("removecolor/bird-original.jpg"),
       settings: {
         tolerance: 11,
         refineStrength: 40,
@@ -182,9 +181,9 @@ export default function RemoveColorTool({
       id: 'building',
       title: pageText.sample2Title || 'Building Sky Replacement',
       desc: pageText.sample2Desc || 'Clear the blue sky behind the building for easy sky replacement.',
-      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg',
-      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-result.png',
-      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/building-original.jpg',
+      beforeUrl: publicCdnUrl("removecolor/building-original.jpg"),
+      afterUrl: publicCdnUrl("removecolor/building-result.png"),
+      url: publicCdnUrl("removecolor/building-original.jpg"),
       settings: {
         tolerance: 11,
         refineStrength: 40,
@@ -196,9 +195,9 @@ export default function RemoveColorTool({
       id: 'rainbow',
       title: pageText.sample3Title || 'Specific Color Eraser',
       desc: pageText.sample3Desc || 'Selectively remove only the green color from the rainbow ring.',
-      beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-original.jpg',
-      afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-result.png',
-      url: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/rainbow-original.jpg',
+      beforeUrl: publicCdnUrl("removecolor/rainbow-original.jpg"),
+      afterUrl: publicCdnUrl("removecolor/rainbow-result.png"),
+      url: publicCdnUrl("removecolor/rainbow-original.jpg"),
       settings: {
         tolerance: 30,
         refineStrength: 40,

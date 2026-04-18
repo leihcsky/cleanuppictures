@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
-import { getLinkHref } from "~/configs/buildLink";
+import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -50,27 +51,28 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
     (process.env.NEXT_PUBLIC_WEBSITE_URL || process.env.NEXT_PUBLIC_WEBSITE_ORIGIN || '').replace(/\/$/, '');
   const pageUrl = origin ? `${origin}/${locale}/remove-emoji-from-photo` : `/${locale}/remove-emoji-from-photo`;
   const homeModeHref = `${getLinkHref(locale, '')}?mode=text`;
+  const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
       title: "Portrait emoji cleanup",
       desc: "Remove large emoji overlays from portrait photos while preserving natural facial details.",
       note: "Ideal for recovering personal photos where face stickers block key features.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-after.jpg"
+      beforeUrl: publicCdnUrl("remove-emoji/sample1-remove-emoji-before.jpg"),
+      afterUrl: publicCdnUrl("remove-emoji/sample1-remove-emoji-after.jpg")
     },
     {
       title: "Business meeting photos",
       desc: "Clean emoji marks and overlays from meeting images for presentations and reports.",
       note: "Great for professional decks where visual clarity and context matter.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample2-remove-emoji-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample2-remove-emoji-after.jpg"
+      beforeUrl: publicCdnUrl("remove-emoji/sample2-remove-emoji-before.jpg"),
+      afterUrl: publicCdnUrl("remove-emoji/sample2-remove-emoji-after.jpg")
     },
     {
       title: "Product image cleanup",
       desc: "Remove sticker-like emoji elements from product photos for cleaner commercial visuals.",
       note: "Useful for storefront, ads, and catalog images that need a polished appearance.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-after.jpg"
+      beforeUrl: publicCdnUrl("remove-emoji/sample3-remove-emoji-before.jpg"),
+      afterUrl: publicCdnUrl("remove-emoji/sample3-remove-emoji-after.jpg")
     }
   ];
   const faqItems = [
@@ -144,11 +146,11 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg" alt="Before remove emoji" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px(publicCdnUrl("remove-emoji/sample1-remove-emoji-before.jpg"))} alt="Before remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-after.jpg" alt="After remove emoji" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px(publicCdnUrl("remove-emoji/sample1-remove-emoji-after.jpg"))} alt="After remove emoji" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>

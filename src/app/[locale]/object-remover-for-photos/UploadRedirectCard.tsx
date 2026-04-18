@@ -5,14 +5,15 @@ import { ArrowUpOnSquareIcon } from "@heroicons/react/24/outline";
 import { getLinkHref, hrefWithSearchParams, getImageProxyHref } from "~/configs/buildLink";
 import { saveUploadBlob } from "~/lib/uploadRedirectBridge";
 import { useToolLandingNavigation } from "~/lib/useToolLandingNavigation";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 
 export default function UploadRedirectCard({ locale }) {
   const pushToolHome = useToolLandingNavigation(locale);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const sampleUrls = [
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-before.jpg',
-    'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-before.jpg'
+    publicCdnUrl("remove-object/sample1-remove-object-before.jpg"),
+    publicCdnUrl("remove-object/sample3-remove-object-before.jpg"),
+    publicCdnUrl("remove-object/sample4-remove-object-before.jpg")
   ];
 
   const gotoHome = () => {

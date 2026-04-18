@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     return Response.json({ msg: "Only https is allowed.", status: 400 }, { status: 400 });
   }
 
-  const allowlist = (process.env.SAMPLE_IMAGE_PROXY_ALLOWLIST || "r2.dev")
+  const allowlist = (process.env.SAMPLE_IMAGE_PROXY_ALLOWLIST || "r2.dev,cleanuppictures.org")
     .split(",")
     .map((v) => v.trim().toLowerCase())
     .filter(Boolean);

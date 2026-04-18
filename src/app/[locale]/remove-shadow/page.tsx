@@ -2,6 +2,7 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -56,22 +57,22 @@ export default function RemoveShadowPage({ params: { locale } }) {
       title: "Portrait shadow cleanup",
       desc: "Reduce harsh facial shadows from sunlight, hats, and side lighting while keeping skin detail natural.",
       note: "Best for portraits where strong side light creates dark facial patches and uneven tone.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png"
+      beforeUrl: publicCdnUrl("removeshadow/sample-portrait-before.jpg"),
+      afterUrl: publicCdnUrl("removeshadow/sample-portrait-after.png")
     },
     {
       title: "Product photo lighting fix",
       desc: "Clean up hard cast shadows on products for brighter and more conversion-ready ecommerce images.",
       note: "Useful for listings where heavy shadows hide key product details and texture.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-product-after.jpg"
+      beforeUrl: publicCdnUrl("removeshadow/sample-product-before.jpg"),
+      afterUrl: publicCdnUrl("removeshadow/sample-product-after.jpg")
     },
     {
       title: "Traffic sign shadow cleanup",
       desc: "Reduce strong cast shadows on road signs and reflective panels so symbols, text, and colors stay readable in street and documentation photos.",
       note: "Best when poles, nearby objects, or low sun leave uneven shadows across the sign face.",
-      beforeUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-before.jpg",
-      afterUrl: "https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-traffic-signs-after.jpg"
+      beforeUrl: publicCdnUrl("removeshadow/sample-traffic-signs-before.jpg"),
+      afterUrl: publicCdnUrl("removeshadow/sample-traffic-signs-after.jpg")
     }
   ];
   const faqItems = [
@@ -145,11 +146,11 @@ export default function RemoveShadowPage({ params: { locale } }) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">BEFORE</p>
-                  <img src={px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-before.jpg")} alt="Before remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px(publicCdnUrl("removeshadow/sample-portrait-before.jpg"))} alt="Before remove shadow" className="w-full h-56 object-cover rounded-xl" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 mb-2">AFTER</p>
-                  <img src={px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/sample-portrait-after.png")} alt="After remove shadow" className="w-full h-56 object-cover rounded-xl" />
+                  <img src={px(publicCdnUrl("removeshadow/sample-portrait-after.png"))} alt="After remove shadow" className="w-full h-56 object-cover rounded-xl" />
                 </div>
               </div>
             </div>

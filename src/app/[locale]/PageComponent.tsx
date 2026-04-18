@@ -8,6 +8,7 @@ import {useEffect, useMemo, useState, useRef} from "react";
 import Script from "next/script";
 import { ArrowUpOnSquareIcon, SparklesIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import ComparisonSlider from "~/components/ComparisonSlider";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 
 export default function PageComponent({
   locale,
@@ -31,20 +32,20 @@ export default function PageComponent({
       { 
         key: 'color', 
         title: indexText.toolColorTitle, 
-        beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg',
-        afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-result.png'
+        beforeUrl: publicCdnUrl("removecolor/bird-original.jpg"),
+        afterUrl: publicCdnUrl("removecolor/bird-result.png")
       },
       { 
         key: 'shadow', 
         title: indexText.toolShadowTitle, 
-        beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/shadow-original.jpg',
-        afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/shadow-result.png'
+        beforeUrl: publicCdnUrl("removeshadow/shadow-original.jpg"),
+        afterUrl: publicCdnUrl("removeshadow/shadow-result.png")
       },
       { 
         key: 'emoji', 
         title: indexText.toolEmojiTitle, 
-        beforeUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeemoji/emoji-original.jpg',
-        afterUrl: 'https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeemoji/emoji-result.png'
+        beforeUrl: publicCdnUrl("removeemoji/emoji-original.jpg"),
+        afterUrl: publicCdnUrl("removeemoji/emoji-result.png")
       },
     ]), [indexText]);
     const [current, setCurrent] = useState(0);
@@ -251,8 +252,8 @@ export default function PageComponent({
               <div className="lg:w-1/2 w-full">
                 <div className="rounded-2xl p-2 bg-white shadow-xl ring-1 ring-slate-100 transform transition-transform hover:scale-[1.01] duration-500">
                   <Comparison 
-                    beforeUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-original.jpg" 
-                    afterUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removecolor/bird-result.png" 
+                    beforeUrl={publicCdnUrl("removecolor/bird-original.jpg")}
+                    afterUrl={publicCdnUrl("removecolor/bird-result.png")}
                   />
                 </div>
               </div>
@@ -264,8 +265,8 @@ export default function PageComponent({
               <div className="lg:w-1/2 w-full">
                 <div className="rounded-2xl p-2 bg-white shadow-xl ring-1 ring-slate-100 transform transition-transform hover:scale-[1.01] duration-500">
                   <Comparison 
-                    beforeUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/shadow-original.jpg" 
-                    afterUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeshadow/shadow-result.png" 
+                    beforeUrl={publicCdnUrl("removeshadow/shadow-original.jpg")}
+                    afterUrl={publicCdnUrl("removeshadow/shadow-result.png")}
                   />
                 </div>
               </div>
@@ -311,8 +312,8 @@ export default function PageComponent({
               <div className="lg:w-1/2 w-full">
                 <div className="rounded-2xl p-2 bg-white shadow-xl ring-1 ring-slate-100 transform transition-transform hover:scale-[1.01] duration-500">
                   <Comparison 
-                    beforeUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeemoji/emoji-original.jpg" 
-                    afterUrl="https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/removeemoji/emoji-result.png" 
+                    beforeUrl={publicCdnUrl("removeemoji/emoji-original.jpg")}
+                    afterUrl={publicCdnUrl("removeemoji/emoji-result.png")}
                   />
                 </div>
               </div>

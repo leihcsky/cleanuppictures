@@ -2,6 +2,7 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -56,22 +57,22 @@ export default function ObjectRemoverForPhotosPage({ params: { locale } }) {
       title: "Group shots — remove one subject",
       desc: "Erase a single person or animal from a group while keeping the rest of the scene natural.",
       note: "Works well when you want a cleaner group photo without re-shooting.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-object/sample1-remove-object-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-object/sample1-remove-object-after.jpg"))
     },
     {
       title: "Interior scenes — remove small clutter",
       desc: "Take out objects like a tissue box on a table so the room feels tidier in the frame.",
       note: "Useful for lifestyle, rental, and social photos where you want less visual noise.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-object/sample3-remove-object-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-object/sample3-remove-object-after.jpg"))
     },
     {
       title: "E-commerce — remove price tags and labels",
       desc: "Clean product shots by removing stickers, tags, and small labels that distract buyers.",
       note: "Helps listings look more polished without a full reshoot.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-object/sample4-remove-object-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-object/sample4-remove-object-after.jpg"))
     }
   ];
   const faqItems = [

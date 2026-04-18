@@ -2,6 +2,7 @@ import Link from "next/link";
 import Header from "~/components/Header";
 import Footer from "~/components/Footer";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 import UploadRedirectCard from "./UploadRedirectCard";
 
 export async function generateMetadata({ params: { locale } }) {
@@ -57,22 +58,22 @@ export default function RemovePersonFromPhotoPage({ params: { locale } }) {
       title: "Group photo — remove one person",
       desc: "Erase a single person from a formal or large group shot while keeping everyone else looking natural.",
       note: "Ideal for class photos, team pictures, and events where one face needs to disappear from the frame.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample1-remove-people-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample1-remove-people-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-people/sample1-remove-people-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-people/sample1-remove-people-after.jpg"))
     },
     {
       title: "Friends group shot — remove someone",
       desc: "Take one person out of a casual friends photo when you need a cleaner crop or updated group image.",
       note: "Works for social posts and albums where you still want the scene to feel spontaneous and real.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-people/sample2-remove-people-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-people/sample2-remove-people-after.jpg"))
     },
     {
       title: "Meeting room — remove an attendee",
       desc: "Remove one person from a conference or meeting photo for reports, decks, or internal comms.",
       note: "Handy when someone has left the team, privacy matters, or the slide needs a tighter group.",
-      beforeUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample3-remove-people-before.jpg"),
-      afterUrl: px("https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample3-remove-people-after.jpg")
+      beforeUrl: px(publicCdnUrl("remove-people/sample3-remove-people-before.jpg")),
+      afterUrl: px(publicCdnUrl("remove-people/sample3-remove-people-after.jpg"))
     }
   ];
   const faqItems = [

@@ -14,6 +14,7 @@ import ComparisonSlider from "./ComparisonSlider";
 import { getLinkHref, getImageProxyHref } from "~/configs/buildLink";
 import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/billingPolicy";
 import { getStripe } from "~/libs/stripeClient";
+import { publicCdnUrl } from "~/libs/cdnPublic";
 
 const clamp = (v:number, min:number, max:number) => Math.min(max, Math.max(min, v));
 const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
@@ -407,8 +408,8 @@ export default function RemoveShadowTool({
       id: 'content-creators',
       title: pageText.sample1Title || 'Portrait Face Shadow',
       desc: pageText.sample1Desc || 'Remove harsh shadows from faces caused by sunlight or hats.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample2-remove-text-after.jpg'),
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-text/sample2-remove-text-before.jpg")),
+      afterUrl: buildSampleProxyUrl(publicCdnUrl("remove-text/sample2-remove-text-after.jpg")),
       settings: { strength: 88, aggressive: false },
       imagePosition: 'center 40%'
     },
@@ -416,8 +417,8 @@ export default function RemoveShadowTool({
       id: 'marketing-teams',
       title: pageText.sample2Title || 'Product Photography',
       desc: pageText.sample2Desc || 'Clean up distracting cast shadows to make products look professional.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample4-remove-object-after.jpg'),
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-object/sample4-remove-object-before.jpg")),
+      afterUrl: buildSampleProxyUrl(publicCdnUrl("remove-object/sample4-remove-object-after.jpg")),
       settings: { strength: 92, aggressive: true },
       imagePosition: 'center 55%'
     },
@@ -425,8 +426,8 @@ export default function RemoveShadowTool({
       id: 'real-estate-teams',
       title: pageText.sample3Title || 'Document Scan',
       desc: pageText.sample3Desc || 'Remove phone shadows from photos of documents and paper.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample3-remove-object-after.jpg'),
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-object/sample3-remove-object-before.jpg")),
+      afterUrl: buildSampleProxyUrl(publicCdnUrl("remove-object/sample3-remove-object-after.jpg")),
       settings: { strength: 86, aggressive: false },
       imagePosition: 'center 58%'
     },
@@ -434,8 +435,8 @@ export default function RemoveShadowTool({
       id: 'ecommerce-sellers',
       title: pageText.sample4Title || 'General Object Shadow',
       desc: pageText.sample4Desc || 'Clean cast shadows around everyday objects for a clearer and more balanced photo.',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-before.jpg'),
-      afterUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample3-remove-emoji-after.jpg'),
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-emoji/sample3-remove-emoji-before.jpg")),
+      afterUrl: buildSampleProxyUrl(publicCdnUrl("remove-emoji/sample3-remove-emoji-after.jpg")),
       settings: { strength: 88, aggressive: false },
       imagePosition: 'center 52%'
     }
@@ -444,22 +445,22 @@ export default function RemoveShadowTool({
     {
       id: 'home-upload-object',
       title: 'Remove object sample',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-object/sample1-remove-object-before.jpg')
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-object/sample1-remove-object-before.jpg"))
     },
     {
       id: 'home-upload-person',
       title: 'Remove person sample',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-people/sample2-remove-people-before.jpg')
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-people/sample2-remove-people-before.jpg"))
     },
     {
       id: 'home-upload-text',
       title: 'Remove text sample',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-text/sample1-remove-text-before.jpg')
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-text/sample1-remove-text-before.jpg"))
     },
     {
       id: 'home-upload-emoji',
       title: 'Remove emoji sample',
-      beforeUrl: buildSampleProxyUrl('https://pub-08705f8dc4354c6ca3fbd77c36fcec23.r2.dev/remove-emoji/sample1-remove-emoji-before.jpg')
+      beforeUrl: buildSampleProxyUrl(publicCdnUrl("remove-emoji/sample1-remove-emoji-before.jpg"))
     }
   ];
   const HOME_USE_CASES = [
