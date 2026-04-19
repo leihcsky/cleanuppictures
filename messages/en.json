@@ -106,7 +106,9 @@
     "footerLegal1": "Terms & Conditions",
     "footerSupport": "Support",
     "footerSupport0": "Pricing",
-    "footerSupport1": "Manage Subscribe"
+    "footerSupport1": "Manage Subscribe",
+    "footerContact": "Contact",
+    "navContact": "Contact"
   },
   "PricingPageText": {
     "title": "Pricing Plans",
@@ -119,7 +121,14 @@
   "ToolPageText": {
     "uploadTitle": "Upload an Image",
     "uploadDesc": "Drag & drop or click to upload (JPG, PNG, WEBP)",
+    "uploadSafetyShortLine": "Uploads are automatically reviewed for safety.",
     "uploadSubDesc": "Instantly remove solid background colors with one click. Simple and easy.",
+    "uploadSafetyNotice": "Uploads are automatically reviewed for safety. Images that violate our Terms of Service or applicable law—including child sexual abuse material, illegal pornography, non-consensual intimate imagery, or other disallowed content—cannot be processed.",
+    "moderationFlagged": "This image was blocked by automated safety review and cannot be used. Automated checks may flag illegal or policy-violating content (including sexual material involving minors). Do not upload disallowed content. If you believe this is a mistake, try a different photo or contact support.",
+    "moderationNetwork": "We could not reach the safety review service (network error). Please check your connection and try again.",
+    "moderationRejected": "This image could not be accepted after safety screening. Please try another image or contact support if you need help.",
+    "moderationProcessBlocked": "Processing was blocked: this image did not pass automated safety review under our content policy. No credits were charged for this blocked attempt. You must use images that comply with our Terms of Service and the law.",
+    "moderationScreeningFailed": "We could not complete the automated safety check for this image. Please try again shortly, use a smaller image, or contact support if the issue continues.",
     "download": "Download Image",
     "original": "Original",
     "processed": "Processed",

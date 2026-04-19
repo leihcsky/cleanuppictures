@@ -62,7 +62,14 @@ export const getToolPageText = async () => {
   return {
     uploadTitle: tTool('uploadTitle'),
     uploadDesc: tTool('uploadDesc'),
+    uploadSafetyShortLine: tTool('uploadSafetyShortLine'),
     uploadSubDesc: tTool('uploadSubDesc'),
+    uploadSafetyNotice: tTool('uploadSafetyNotice'),
+    moderationFlagged: tTool('moderationFlagged'),
+    moderationNetwork: tTool('moderationNetwork'),
+    moderationRejected: tTool('moderationRejected'),
+    moderationProcessBlocked: tTool('moderationProcessBlocked'),
+    moderationScreeningFailed: tTool('moderationScreeningFailed'),
     download: tTool('download'),
     original: tTool('original'),
     processed: tTool('processed'),
@@ -536,6 +543,8 @@ export const getMenuText = async () => {
     footerSupport: tMenu('footerSupport'),
     footerSupport0: tMenu('footerSupport0'),
     footerSupport1: tMenu('footerSupport1'),
+    footerContact: tMenu('footerContact'),
+    navContact: tMenu('navContact'),
   }
 }
 

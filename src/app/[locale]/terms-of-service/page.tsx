@@ -6,7 +6,8 @@ export async function generateMetadata({ params: { locale } }) {
   const origin = getPublicSiteOriginNoSlash();
   const canonicalUrl = absoluteCanonicalUrl(origin, locale, "terms-of-service");
   const title = "Terms of Service | Pic Cleaner";
-  const description = "Read the terms governing your use of Pic Cleaner services, subscriptions, credits, and acceptable use.";
+  const description =
+    "Read the terms governing your use of Pic Cleaner services, subscriptions, credits, acceptable use, and content standards (including NSFW restrictions).";
   return {
     title,
     description,
@@ -30,7 +31,7 @@ export async function generateMetadata({ params: { locale } }) {
 export default async function TermsOfServicePage({ params: { locale } }) {
   const brand = process.env.NEXT_PUBLIC_WEBSITE_NAME || 'Pic Cleaner';
   const contactEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@cleanuppictures.org';
-  const effectiveDate = '2026-04-01';
+  const effectiveDate = '2026-04-18';
 
   return (
     <>
@@ -87,6 +88,34 @@ export default async function TermsOfServicePage({ params: { locale } }) {
                 <li>No attempts to bypass limits, abuse APIs, scrape protected resources, or interfere with platform security.</li>
                 <li>You must have rights to upload and process the content you submit.</li>
               </ul>
+              <h3 className="mt-6 text-lg font-semibold text-slate-900">5.1 Content standards (including NSFW and sensitive material)</h3>
+              <p className="mt-3 text-slate-700 leading-7">
+                Our services are intended for lawful, professional, and general-purpose image cleanup. You must not upload, submit, or ask us to process images
+                that violate applicable law or these terms, including without limitation:
+              </p>
+              <ul className="mt-3 space-y-2 text-slate-700 leading-7 list-disc pl-5">
+                <li>
+                  Child sexual abuse material (CSAM) or any sexual depiction of minors, including synthetic, illustrated, or partially clothed depictions where a
+                  reasonable person would interpret the content as sexualizing minors.
+                </li>
+                <li>Illegal pornography or other sexually explicit content where possession, distribution, or processing is unlawful in your jurisdiction or ours.</li>
+                <li>Non-consensual intimate imagery, voyeuristic content, or content that violates another person&apos;s privacy, publicity, or personality rights.</li>
+                <li>
+                  Graphic violence, gore, or cruelty presented for shock or exploitation where such content is restricted or unlawful, and any content that combines
+                  sexual themes with violence or exploitation in a way that is prohibited by law.
+                </li>
+                <li>Content intended to harass, threaten, defraud, or incite violence against individuals or groups.</li>
+              </ul>
+              <p className="mt-3 text-slate-700 leading-7">
+                We may use automated systems (including third-party content moderation and safety services) to evaluate whether submitted images meet these
+                standards. Automated screening is not a legal determination and may produce false positives or false negatives. If content is flagged, assessed as
+                disallowed, or otherwise suspected to violate this section or the law, we may refuse to process it, withhold or remove outputs, limit features,
+                suspend or terminate accounts, and cooperate with law enforcement where required.
+              </p>
+              <p className="mt-3 text-slate-700 leading-7">
+                You represent and warrant that images you submit comply with this section and applicable law. You must not attempt to evade moderation, overload
+                screening systems, or misuse the service to distribute prohibited content.
+              </p>
             </section>
 
             <section className="mt-8">

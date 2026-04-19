@@ -1,14 +1,14 @@
 'use client';
 
-import {useEffect} from 'react';
+import { useEffect } from 'react';
 
 type Props = {
-  error: Error;
+  error: Error & { digest?: string };
   reset(): void;
 };
 
-export default function Error({error, reset}: Props) {
-
+/** Avoid naming this component `Error` (shadows global `Error`) — helps tooling and dev overlays. */
+export default function AppError({ error, reset }: Props) {
   useEffect(() => {
     console.error(error);
   }, [error]);

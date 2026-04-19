@@ -98,6 +98,11 @@ export default function Footer({
                       {menuText.footerSupport1}
                     </Link>
                   </li>
+                  <li>
+                    <Link href={getLinkHref(locale, 'contact')} onClick={() => checkPageAndLoading('contact')} className="text-sm leading-6 text-slate-600 hover:text-primary-600 transition-colors">
+                      {menuText.footerContact}
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

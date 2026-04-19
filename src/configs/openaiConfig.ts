@@ -1,7 +1,26 @@
 export const apiKey = process.env.OPENAI_API_KEY
 export const model = process.env.OPENAI_API_MODEL
+/** Chat/completions base (e.g. https://openrouter.ai/api or https://api.openai.com/v1). Used with `${baseUrl}/v1/chat/completions`. */
 export const baseUrl = process.env.OPENAI_API_BASE_URL
 export const temperature = 0
+
+/** API key for /v1/moderations (defaults to OPENAI_API_KEY). */
+export function getModerationApiKey(): string {
+  return String(process.env.OPENAI_MODERATION_API_KEY || process.env.OPENAI_API_KEY || "").trim()
+}
+
+/**
+ * Moderation must hit an OpenAI-compatible /moderations endpoint (official: https://api.openai.com/v1).
+ * Do not point this at OpenRouter unless your proxy implements moderations.
+ */
+export function getModerationApiBaseUrl(): string {
+  const raw = process.env.OPENAI_MODERATION_API_BASE_URL?.trim()
+  if (raw) return raw.replace(/\/$/, "")
+  return "https://api.openai.com/v1"
+}
+
+/** Vision-capable moderation model (OpenAI: omni-moderation-latest). */
+export const moderationModel = process.env.OPENAI_MODERATION_MODEL?.trim() || "omni-moderation-latest"
 
 
 export const getCurrentLanguage = (to = '') => {

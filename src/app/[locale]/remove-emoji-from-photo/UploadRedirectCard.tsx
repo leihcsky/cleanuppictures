@@ -6,6 +6,7 @@ import { getLinkHref, hrefWithSearchParams, getImageProxyHref } from "~/configs/
 import { saveUploadBlob } from "~/lib/uploadRedirectBridge";
 import { useToolLandingNavigation } from "~/lib/useToolLandingNavigation";
 import { publicCdnUrl } from "~/libs/cdnPublic";
+import { getUploadSafetyShortLine } from "~/lib/landingUploadSafetyNotice";
 
 export default function UploadRedirectCard({ locale }) {
   const pushToolHome = useToolLandingNavigation(locale);
@@ -63,6 +64,7 @@ export default function UploadRedirectCard({ locale }) {
         <ArrowUpOnSquareIcon className="w-5 h-5 mr-2" />
         Upload Image
       </button>
+      <p className="mt-3 text-sm text-slate-500 max-w-md mx-auto leading-snug">{getUploadSafetyShortLine(locale)}</p>
       <p className="mt-4 text-sm text-slate-500">No image? Try one of these</p>
       <div className="mt-4 flex items-center justify-center gap-3 flex-wrap">
         {sampleUrls.map((url, idx) => (

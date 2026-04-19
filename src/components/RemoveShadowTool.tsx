@@ -16,6 +16,7 @@ import { getCreditPackOffers, getMonthlySubscriptionOffer } from "~/configs/bill
 import { isActiveSubscriptionStatus } from "~/libs/subscriptionStatus";
 import { getStripe } from "~/libs/stripeClient";
 import { publicCdnUrl } from "~/libs/cdnPublic";
+import { requestClientImageModeration } from "~/libs/imageModerationClient";
 
 const clamp = (v:number, min:number, max:number) => Math.min(max, Math.max(min, v));
 const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
@@ -516,27 +517,57 @@ export default function RemoveShadowTool({
     setShowLoadingModal(false);
   }, [setShowLoadingModal]);
 
-  const processFile = useCallback((file) => {
-    if (!file.type.startsWith('image/')) return;
-    sessionStorage.removeItem('cleanup_pending_upload');
-    setShowReference(false);
-    setHistory([]);
-    setHistoryStep(-1);
-    setMaskCanvasData(null);
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      setOriginalImage(img);
-      setImageSrc(url);
-      setStrength(90);
-      if (maskCanvasRef.current) {
-        const ctx = maskCanvasRef.current.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
-      }
+  const processFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      sessionStorage.removeItem("cleanup_pending_upload");
+      setShowReference(false);
+      setHistory([]);
+      setHistoryStep(-1);
       setMaskCanvasData(null);
-    };
-    img.src = url;
-  }, []);
+      let dataUrl: string;
+      try {
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("read"));
+          reader.readAsDataURL(file);
+        });
+      } catch {
+        alert("Could not read this image.");
+        return;
+      }
+      const mod = await requestClientImageModeration(locale, dataUrl);
+      if (mod.ok === false) {
+        const text =
+          mod.kind === "flagged"
+            ? toolText?.moderationFlagged ||
+              "This image was blocked by automated safety review and cannot be uploaded. Do not upload illegal or policy-violating content."
+            : mod.kind === "network"
+              ? toolText?.moderationNetwork || "Could not reach the safety review service. Please try again."
+              : toolText?.moderationRejected ||
+                mod.message ||
+                "This image could not be verified. Please try another image or contact support.";
+        setInfoMessage(text);
+        setShowInfoModal(true);
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        setOriginalImage(img);
+        setImageSrc(url);
+        setStrength(90);
+        if (maskCanvasRef.current) {
+          const ctx = maskCanvasRef.current.getContext("2d");
+          if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+        }
+        setMaskCanvasData(null);
+      };
+      img.src = url;
+    },
+    [locale, toolText]
+  );
   const loadImageFromSource = useCallback(
     (
       source: string,
@@ -554,12 +585,32 @@ export default function RemoveShadowTool({
         opts?.onSettled?.();
       };
       const shouldAlert = () => opts?.alertOnlyIfMounted?.() ?? true;
-      img.onload = () => {
+      img.onload = async () => {
+        if (/^data:image\//i.test(source)) {
+          const mod = await requestClientImageModeration(locale, source);
+          if (mod.ok === false) {
+            settled();
+            if (opts?.alertOnError && shouldAlert()) {
+              const text =
+                mod.kind === "flagged"
+                  ? toolText?.moderationFlagged ||
+                    "This image was blocked by automated safety review and cannot be loaded. Do not upload illegal or policy-violating content."
+                  : mod.kind === "network"
+                    ? toolText?.moderationNetwork || "Could not reach the safety review service. Please try again."
+                    : toolText?.moderationRejected ||
+                      mod.message ||
+                      "This image could not be verified. Please try another image or contact support.";
+              setInfoMessage(text);
+              setShowInfoModal(true);
+            }
+            return;
+          }
+        }
         setOriginalImage(img);
         setImageSrc(source);
         setStrength(90);
         if (maskCanvasRef.current) {
-          const ctx = maskCanvasRef.current.getContext('2d');
+          const ctx = maskCanvasRef.current.getContext("2d");
           if (ctx) ctx.clearRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
         }
         setMaskCanvasData(null);
@@ -586,7 +637,7 @@ export default function RemoveShadowTool({
       };
       img.src = source;
     },
-    []
+    [locale, toolText]
   );
   useEffect(() => {
     let alive = true;
@@ -1254,6 +1305,25 @@ export default function RemoveShadowTool({
           setShowQuotaModal(true);
           return;
         }
+        if (Number(json?.status) === 403) {
+          setInfoMessage(
+            toolText?.moderationProcessBlocked ||
+              (locale === 'zh'
+                ? '处理已阻止：该图片未通过自动安全审核。本次未扣除积分。'
+                : 'Processing was blocked: this image did not pass automated safety review. No credits were charged.')
+          );
+          setShowInfoModal(true);
+          return;
+        }
+        if (Number(json?.status) === 422) {
+          setInfoMessage(
+            toolText?.moderationScreeningFailed ||
+              json?.msg ||
+              (locale === 'zh' ? '无法完成安全检测，请稍后重试。' : 'Safety screening could not be completed. Please try again.')
+          );
+          setShowInfoModal(true);
+          return;
+        }
         setInfoMessage(json?.msg || (locale === 'zh' ? 'HD 生成失败，请稍后重试。' : 'HD generation failed. Please try again.'));
         setShowInfoModal(true);
         return;
@@ -1718,6 +1788,25 @@ export default function RemoveShadowTool({
           setShowQuotaModal(true);
           return;
         }
+        if (Number(json?.status) === 403) {
+          setInfoMessage(
+            toolText?.moderationProcessBlocked ||
+              (locale === 'zh'
+                ? '处理已阻止：该图片未通过自动安全审核。本次未扣除积分。'
+                : 'Processing was blocked: this image did not pass automated safety review. No credits were charged.')
+          );
+          setShowInfoModal(true);
+          return;
+        }
+        if (Number(json?.status) === 422) {
+          setInfoMessage(
+            toolText?.moderationScreeningFailed ||
+              json?.msg ||
+              (locale === 'zh' ? '无法完成安全检测，请稍后重试。' : 'Safety screening could not be completed. Please try again.')
+          );
+          setShowInfoModal(true);
+          return;
+        }
         console.error('AI refine failed:', json.msg);
         setInfoMessage(json?.msg || toolText?.processFailed || 'Processing failed.');
         setShowInfoModal(true);
@@ -1922,16 +2011,13 @@ export default function RemoveShadowTool({
 
   return (
     <>
-      {imageSrc && (
-        <LoginModal
-          loadingText={commonText?.loadingText || 'Loading...'}
-          redirectPath={pageResult}
-          loginModalDesc={authText?.loginModalDesc || 'Please login to continue.'}
-          loginModalButtonText={authText?.loginModalButtonText || 'Continue with Google'}
-        />
-      )}
-      {showQuotaModal && (
-        <Dialog as="div" className="relative z-[90]" open={showQuotaModal} onClose={setShowQuotaModal}>
+      <LoginModal
+        loadingText={commonText?.loadingText || 'Loading...'}
+        redirectPath={pageResult}
+        loginModalDesc={authText?.loginModalDesc || 'Please login to continue.'}
+        loginModalButtonText={authText?.loginModalButtonText || 'Continue with Google'}
+      />
+      <Dialog as="div" className="relative z-[90]" open={showQuotaModal} onClose={setShowQuotaModal}>
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]" />
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
@@ -1968,9 +2054,7 @@ export default function RemoveShadowTool({
             </div>
           </div>
         </Dialog>
-      )}
-      {showUpgradeChoiceModal && (
-        <Dialog as="div" className="relative z-[95]" open={showUpgradeChoiceModal} onClose={setShowUpgradeChoiceModal}>
+      <Dialog as="div" className="relative z-[95]" open={showUpgradeChoiceModal} onClose={setShowUpgradeChoiceModal}>
           <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[1px]" />
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
@@ -2084,9 +2168,7 @@ export default function RemoveShadowTool({
             </div>
           </div>
         </Dialog>
-      )}
-      {showInfoModal && (
-        <Dialog as="div" className="relative z-[90]" open={showInfoModal} onClose={setShowInfoModal}>
+      <Dialog as="div" className="relative z-[90]" open={showInfoModal} onClose={setShowInfoModal}>
           <div className="fixed inset-0 bg-slate-900/35" />
           <div className="fixed inset-0 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
@@ -2107,7 +2189,6 @@ export default function RemoveShadowTool({
             </div>
           </div>
         </Dialog>
-      )}
       {/* Custom Cursor */}
       <div 
         ref={cursorRef}
@@ -2196,7 +2277,9 @@ export default function RemoveShadowTool({
                             <h2 className="text-xl font-bold text-slate-900">{toolText.uploadTitle}</h2>
                           )}
                          {isHomeTool ? (
-                           <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">Drop your photo here, or click to upload and start editing.</p>
+                           <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">
+                             {toolText.uploadSafetyShortLine}
+                           </p>
                          ) : (
                            <p className="text-sm text-slate-600 max-w-sm sm:max-w-max mx-auto leading-relaxed sm:whitespace-nowrap">{toolText.uploadDesc}</p>
                          )}

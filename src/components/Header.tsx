@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Dialog } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon, EnvelopeIcon, TagIcon, UserCircleIcon, ArrowLeftStartOnRectangleIcon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, CurrencyDollarIcon, Squares2X2Icon, SparklesIcon, EnvelopeIcon, TagIcon, UserCircleIcon, ArrowLeftStartOnRectangleIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline'
 import { GlobeAltIcon } from '@heroicons/react/24/outline'
 import { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
@@ -146,6 +146,14 @@ export default function Header({
             className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
             <CurrencyDollarIcon className="w-5 h-5" />
             {menuText.pricing}
+          </Link>
+
+          <Link
+            href={getLinkHref(locale, 'contact')}
+            onClick={() => checkPageAndLoading('contact')}
+            className="text-base font-medium leading-6 text-slate-700 hover:text-primary-600 transition-colors flex items-center gap-2">
+            <ChatBubbleLeftRightIcon className="w-5 h-5" />
+            {menuText.navContact}
           </Link>
         </div>
         <div className="hidden lg:flex lg:items-center lg:gap-4">
@@ -346,6 +354,13 @@ export default function Header({
                    className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
                    <CurrencyDollarIcon className="w-5 h-5" />
                    {menuText.pricing}
+                 </Link>
+                 <Link
+                   href={getLinkHref(locale, 'contact')}
+                   onClick={() => checkPageAndLoading('contact')}
+                   className="-mx-3 rounded-lg px-3 py-2 text-base font-semibold leading-7 text-slate-900 hover:bg-primary-50 hover:text-primary-600 transition-colors flex items-center gap-2">
+                   <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                   {menuText.navContact}
                  </Link>
                 {process.env.NEXT_PUBLIC_CHECK_GOOGLE_LOGIN !== '0' && (
                   <div className="pt-4 mt-4 border-t border-gray-100">

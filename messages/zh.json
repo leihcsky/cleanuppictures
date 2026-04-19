@@ -106,7 +106,9 @@
     "footerLegal1": "条款和条件",
     "footerSupport": "支持",
     "footerSupport0": "定价",
-    "footerSupport1": "管理订阅"
+    "footerSupport1": "管理订阅",
+    "footerContact": "联系我们",
+    "navContact": "联系我们"
   },
   "PricingPageText": {
     "title": "价格方案",
@@ -119,7 +121,14 @@
   "ToolPageText": {
     "uploadTitle": "上传图片",
     "uploadDesc": "拖放或点击上传 (JPG, PNG, WEBP)",
+    "uploadSafetyShortLine": "上传内容将自动进行安全审核。",
     "uploadSubDesc": "一键移除纯色背景，简单又方便",
+    "uploadSafetyNotice": "上传的图片将自动进行安全审核。包含违法或违反《服务条款》的内容（例如儿童性虐待材料、非法色情、未经同意的私密影像等）将无法处理。",
+    "moderationFlagged": "该图片未通过自动安全审核，无法使用。系统可能标记违法或违反政策的内容（包括涉及未成年人的色情材料）。请勿上传违禁内容。如您认为属于误判，请更换照片或联系客服。",
+    "moderationNetwork": "无法连接安全审核服务（网络错误）。请检查网络后重试。",
+    "moderationRejected": "该图片未能通过安全筛查，无法使用。请更换图片，如需帮助请联系客服。",
+    "moderationProcessBlocked": "处理已阻止：该图片未通过自动安全审核（内容政策）。本次未扣除积分。请仅上传符合《服务条款》与法律要求的图片。",
+    "moderationScreeningFailed": "暂时无法对该图片完成自动安全检测。请稍后重试、尝试更小的图片，或联系客服。",
     "download": "下载图片",
     "original": "原图",
     "processed": "处理后",

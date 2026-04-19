@@ -49,7 +49,6 @@ export default function RemoveGlareFromPhotoPage({ params: { locale } }) {
           <p className="mt-5 text-lg text-slate-600">
             Use AI to reduce harsh glare and reflective hotspots on glasses, skin, products, windows, and glossy surfaces while keeping details natural.
           </p>
-
           <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
             <h2 className="text-2xl font-semibold text-slate-900">How to remove glare in 3 steps</h2>
             <ol className="mt-4 list-decimal pl-6 space-y-2 text-slate-700">

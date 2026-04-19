@@ -1,5 +1,6 @@
 import { getReplicateClient } from "~/libs/replicateClient";
 import { getUserFacingAiErrorMessage, resolveAiErrorLocale } from "~/lib/aiErrorUserMessage";
+import { moderateImageDataUrl } from "~/libs/openaiModeration";
 import { getDb, tableExists, withDbTransaction, type DbClient } from "~/libs/db";
 import { GUEST_COOKIE_KEY, VISITOR_COOKIE_KEY, resolveApiUserContext } from "~/servers/visitorContext";
 import { getBusinessDateString } from "~/libs/date";
@@ -567,6 +568,21 @@ export async function POST(req: NextRequest) {
 
     if (!imageDataUrl || typeof imageDataUrl !== "string") {
       return buildResponse({ msg: "Invalid image input.", status: 400 }, 400);
+    }
+    if (imageDataUrl.startsWith("data:image/")) {
+      const mod = await moderateImageDataUrl(imageDataUrl);
+      if (mod.allowed === false) {
+        if (mod.flagged) {
+          return buildResponse(
+            { msg: mod.message || "This image did not pass content guidelines.", status: 403 },
+            403
+          );
+        }
+        return buildResponse(
+          { msg: mod.message || "This image could not be screened.", status: 422 },
+          422
+        );
+      }
     }
     if (!upscaleOnly && !maskDataUrl && !kieMaskDataUrl) {
       return buildResponse({ msg: "Mask is required for this model. Please paint over the area to remove.", status: 400 }, 400);
