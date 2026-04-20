@@ -66,6 +66,10 @@ export default async function TermsOfServicePage({ params: { locale } }) {
               <ul className="mt-3 space-y-2 text-slate-700 leading-7 list-disc pl-5">
                 <li>Free plans include limited usage and may have quality or speed restrictions.</li>
                 <li>Paid subscriptions renew automatically unless canceled before renewal.</li>
+                <li>
+                  You can manage or cancel subscription renewal from <strong>Manage Subscribe</strong> under{" "}
+                  <strong>Purchase History &amp; Refunds</strong>.
+                </li>
                 <li>Credit purchases may be offered as one-time top-ups and are consumed by successful processing actions.</li>
                 <li>Displayed checkout prices are final for your order and include applicable taxes where required by law (no hidden fees).</li>
                 <li>Your card issuer or bank may still apply separate currency-conversion or foreign-transaction charges outside our control.</li>

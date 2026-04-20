@@ -346,6 +346,28 @@ export default function Pricing({
                           : "Current plan"
                         : plan.buttonText}
                   </button>
+                  {plan.kind === "pro" && (
+                    <p className="mt-2 text-center text-xs text-slate-500 leading-5">
+                      {isZh ? "订阅将自动按月扣费，直至您取消。" : "Subscription renews automatically and you will be charged monthly until canceled."}{" "}
+                      {isZh ? (
+                        <>
+                          可在{" "}
+                          <Link href={getLinkHref(locale, "my")} className="font-medium text-blue-700 hover:text-blue-800">
+                            Manage Subscribe
+                          </Link>{" "}
+                          的 <span className="font-medium">Purchase History &amp; Refunds</span> 中查看并发起取消。
+                        </>
+                      ) : (
+                        <>
+                          You can review and cancel in{" "}
+                          <Link href={getLinkHref(locale, "my")} className="font-medium text-blue-700 hover:text-blue-800">
+                            Manage Subscribe
+                          </Link>{" "}
+                          under <span className="font-medium">Purchase History &amp; Refunds</span>.
+                        </>
+                      )}
+                    </p>
+                  )}
                   {plan.kind === "pro" && planSubscribed && (
                     <p className="mt-2 text-center text-xs text-slate-500">
                       <Link href={getLinkHref(locale, "my")} className="font-medium text-blue-700 hover:text-blue-800">

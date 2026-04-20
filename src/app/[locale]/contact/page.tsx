@@ -66,8 +66,8 @@ export default function ContactPage({ params: { locale } }: { params: { locale: 
         ],
     responseTitle: isZh ? "回复时间" : "Response time",
     responseBody: isZh
-      ? "我们通常在几个工作日内回复；高峰期可能略长。紧急账单问题请在主题中注明「Billing」。"
-      : "We usually reply within a few business days; it may take longer during peak periods. Put “Billing” in the subject line for urgent payment issues.",
+      ? "客服时区：UTC+8。服务时间：周一至周日（Mon-Sun）。我们会在 3 个工作日内处理并回复您的请求；紧急账单问题请在主题中注明「Billing」。"
+      : "Support timezone: UTC+8. Service hours: Monday to Sunday (Mon-Sun). We process and respond within 3 business days; put “Billing” in the subject line for urgent billing issues.",
     legalTitle: isZh ? "法律与合规" : "Legal & compliance",
     legalBody: isZh ? (
       <>
