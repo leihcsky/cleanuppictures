@@ -31,6 +31,9 @@ yarn-error.log*
 
 .env*.production
 
+# Google Cloud service account JSON (image moderation — do not commit)
+/secrets/*.json
+
 # vercel
 .vercel
 

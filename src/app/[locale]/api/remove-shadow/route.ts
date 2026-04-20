@@ -1,6 +1,6 @@
 import { getReplicateClient } from "~/libs/replicateClient";
 import { getUserFacingAiErrorMessage, resolveAiErrorLocale } from "~/lib/aiErrorUserMessage";
-import { moderateImageDataUrl } from "~/libs/openaiModeration";
+import { moderateImageDataUrl } from "~/libs/imageModeration";
 import { getDb, tableExists, withDbTransaction, type DbClient } from "~/libs/db";
 import { GUEST_COOKIE_KEY, VISITOR_COOKIE_KEY, resolveApiUserContext } from "~/servers/visitorContext";
 import { getBusinessDateString } from "~/libs/date";

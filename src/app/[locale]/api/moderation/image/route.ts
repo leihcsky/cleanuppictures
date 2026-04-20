@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { moderateImageDataUrl } from "~/libs/openaiModeration";
+import { moderateImageDataUrl } from "~/libs/imageModeration";
 
 export const dynamic = "force-dynamic";
 
