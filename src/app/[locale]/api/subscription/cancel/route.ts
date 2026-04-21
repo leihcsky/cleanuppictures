@@ -37,21 +37,31 @@ export async function POST(req: NextRequest) {
 
   try {
     const creem = getCreemClient();
+    /** Cancel at period end (Creem: mode `scheduled` + onExecute `cancel`). `creem_io` types omit `onExecute` from OpenAPI. */
     const result = await creem.subscriptions.cancel({
       subscriptionId: providerSubId,
-      mode: "immediate"
-    });
-    const remoteStatus = String(result?.status || "canceled").toLowerCase();
-    await db.query("update subscriptions set status=$1 where id=$2", [remoteStatus || "canceled", Number(sub.id || 0)]);
-    const lastSubOrderRes = await db.query(
-      "select id from orders where user_id=$1 and provider=$2 and order_kind=$3 and status=$4 order by id desc limit 1",
-      [userId, "creem", "subscription", "paid"]
-    );
-    const lastSubOrderId = Number(lastSubOrderRes.rows?.[0]?.id || 0);
-    if (lastSubOrderId > 0) {
-      await db.query("update orders set status=$1,updated_at=now() where id=$2", ["canceled", lastSubOrderId]);
+      mode: "scheduled",
+      onExecute: "cancel"
+    } as any);
+    const remoteStatus = String(result?.status || "scheduled_cancel").toLowerCase();
+    await db.query("update subscriptions set status=$1 where id=$2", [remoteStatus || "scheduled_cancel", Number(sub.id || 0)]);
+
+    if (remoteStatus === "canceled") {
+      const lastSubOrderRes = await db.query(
+        "select id from orders where user_id=$1 and provider=$2 and order_kind=$3 and status=$4 order by id desc limit 1",
+        [userId, "creem", "subscription", "paid"]
+      );
+      const lastSubOrderId = Number(lastSubOrderRes.rows?.[0]?.id || 0);
+      if (lastSubOrderId > 0) {
+        await db.query("update orders set status=$1,updated_at=now() where id=$2", ["canceled", lastSubOrderId]);
+      }
     }
-    return Response.json({ status: 1, msg: "Subscription canceled", result });
+
+    return Response.json({
+      status: 1,
+      msg: "Auto-renewal canceled; access continues until the end of the current billing period.",
+      result
+    });
   } catch (e: any) {
     return Response.json({ status: 0, msg: e?.message || "Cancel subscription failed" }, { status: 500 });
   }

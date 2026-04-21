@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
   const subRes = await db.query("select * from subscriptions where user_id=$1 order by id desc limit 1", [userId]);
   const subRow = subRes.rows?.[0];
   const subStatus = String(subRow?.status || "");
-  const subscribed = subStatus === "active" || subStatus === "trialing";
+  const subscribed =
+    subStatus === "active" || subStatus === "trialing" || subStatus === "scheduled_cancel";
 
   const creditRes = await db.query("select * from credits where user_id=$1 limit 1", [userId]);
   const creditsBalance = Number(creditRes.rows?.[0]?.balance || 0);

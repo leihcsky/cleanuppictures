@@ -65,7 +65,7 @@ type BillingSegment = "visitor" | "free" | "credits" | "pro";
 
 function resolveBillingSegment(loggedIn: boolean, subscriptionStatus: string, creditsBalance: number): BillingSegment {
   if (!loggedIn) return "visitor";
-  if (subscriptionStatus === "active" || subscriptionStatus === "trialing") return "pro";
+  if (isActiveSubscriptionStatus(subscriptionStatus)) return "pro";
   if (creditsBalance > 0) return "credits";
   return "free";
 }

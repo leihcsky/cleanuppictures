@@ -65,10 +65,13 @@ export default async function TermsOfServicePage({ params: { locale } }) {
               <h2 className="text-xl font-semibold text-slate-900">3. Plans, Credits, and Billing</h2>
               <ul className="mt-3 space-y-2 text-slate-700 leading-7 list-disc pl-5">
                 <li>Free plans include limited usage and may have quality or speed restrictions.</li>
-                <li>Paid subscriptions renew automatically unless canceled before renewal.</li>
                 <li>
-                  You can manage or cancel subscription renewal from <strong>Manage Subscribe</strong> under{" "}
-                  <strong>Purchase History &amp; Refunds</strong>.
+                  Paid subscriptions renew automatically. You can turn off auto-renewal before the next charge; when you do, you generally keep access through the
+                  end of the billing period you already paid for (unless your payment provider or Creem indicates otherwise).
+                </li>
+                <li>
+                  You can manage subscription renewal from <strong>Manage Subscribe</strong> under <strong>Purchase History &amp; Refunds</strong>. Canceling
+                  renewal is not the same as an immediate refund for the current period.
                 </li>
                 <li>Credit purchases may be offered as one-time top-ups and are consumed by successful processing actions.</li>
                 <li>Displayed checkout prices are final for your order and include applicable taxes where required by law (no hidden fees).</li>
@@ -81,7 +84,8 @@ export default async function TermsOfServicePage({ params: { locale } }) {
             <section className="mt-8">
               <h2 className="text-xl font-semibold text-slate-900">4. Cancellations and Refunds</h2>
               <p className="mt-3 text-slate-700 leading-7">
-                Cancellation stops future subscription renewals. Refund handling follows our Refund Policy, including eligibility windows and billing-error review.
+                Canceling a subscription turns off future renewals; you typically retain access for the remainder of the current paid period. Refunds for amounts
+                already charged follow our Refund Policy, including eligibility windows and billing-error review, and are separate from turning off renewal.
               </p>
             </section>
 

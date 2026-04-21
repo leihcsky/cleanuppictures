@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { uploadBufferToR2, getR2ConfigState } from "~/libs/R2";
 import { randomUUID } from "crypto";
 import { dataUrlExceedsUploadByteLimit, estimateDataUrlDecodedBytes } from "~/lib/clientImageUploadLimits";
+import { isActiveSubscriptionStatus } from "~/libs/subscriptionStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -637,7 +638,7 @@ export async function POST(req: NextRequest) {
     visitorCookieValue = userContextBase.visitorCookieValue;
     const subscriptionRes = await db.query("select * from subscriptions where user_id=$1 order by id desc limit 1", [userContextBase.userId]);
     const subStatus = String(subscriptionRes.rows?.[0]?.status || "");
-    const isSubscribed = subStatus === "active";
+    const isSubscribed = isActiveSubscriptionStatus(subStatus);
     const creditBalance = await ensureCreditsRow(userContextBase.userId);
     const limitUserId = Number(userContextBase.limitUserId || userContextBase.userId);
     const usage = await getTodayUsage(limitUserId);

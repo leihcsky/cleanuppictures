@@ -10,6 +10,23 @@ import TopBlurred from "~/components/TopBlurred";
 import {createPortalLink} from "~/libs/nextAuthClient";
 import {getPaymentProvider} from "~/configs/billingPolicy";
 
+type OrdersMessageTone = "default" | "success" | "error";
+
+function refundBlockHintText(locale: string, key: string | null | undefined): string | undefined {
+  if (!key) return undefined;
+  const zh: Record<string, string> = {
+    window_expired: "已超过 7 天退款期限，无法申请退款。",
+    used_credits: "该订单积分已部分使用，无法申请整单退款。",
+    no_bucket: "未找到该订单对应的积分记录，暂无法申请退款。"
+  };
+  const en: Record<string, string> = {
+    window_expired: "Refund window has passed (over 7 days).",
+    used_credits: "Some credits from this purchase were used; a full refund is not available.",
+    no_bucket: "No credit record found for this order."
+  };
+  return locale === "zh" ? zh[key] || undefined : en[key] || undefined;
+}
+
 const PageComponent = ({
                          locale,
                          worksText
@@ -17,6 +34,7 @@ const PageComponent = ({
   const [pagePath] = useState('my');
   const {
     setShowLoadingModal,
+    setShowLoginModal,
     userData,
     commonText
   } = useCommonContext();
@@ -27,8 +45,14 @@ const PageComponent = ({
   const [historyItems, setHistoryItems] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const HISTORY_PAGE_SIZE = 8;
   const [refundLoadingOrderId, setRefundLoadingOrderId] = useState(0);
   const [ordersMessage, setOrdersMessage] = useState("");
+  const [ordersMessageTone, setOrdersMessageTone] = useState<OrdersMessageTone>("default");
+  const [refundConfirmOrderId, setRefundConfirmOrderId] = useState<number | null>(null);
+  const [refundConfirmOrderLabel, setRefundConfirmOrderLabel] = useState("");
   const [cancelSubLoading, setCancelSubLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [overview, setOverview] = useState<any>({
@@ -73,12 +97,14 @@ const PageComponent = ({
       }
       setOrdersLoading(true);
       setOrdersMessage("");
+      setOrdersMessageTone("default");
       try {
-        const res = await fetch(`/api/orders/list`);
+        const res = await fetch(`/${locale}/api/orders/list`);
         const json = await res.json();
         setOrders(json?.orders || []);
       } catch {
         setOrdersMessage(locale === "zh" ? "订单记录加载失败，请稍后重试。" : "Failed to load order history.");
+        setOrdersMessageTone("error");
       } finally {
         setOrdersLoading(false);
       }
@@ -90,41 +116,63 @@ const PageComponent = ({
     const fetchHistory = async () => {
       if (!userData?.user_id) {
         setHistoryItems([]);
+        setHistoryTotalPages(1);
         return;
       }
       setHistoryLoading(true);
       try {
-        const res = await fetch(`/api/history/list`);
+        const res = await fetch(`/${locale}/api/history/list?page=${historyPage}&pageSize=${HISTORY_PAGE_SIZE}`);
         const json = await res.json();
         setHistoryItems(json?.items || []);
+        setHistoryTotalPages(Math.max(1, Number(json?.total_pages || 1)));
       } finally {
         setHistoryLoading(false);
       }
     };
     fetchHistory();
-  }, [userData?.user_id]);
+  }, [userData?.user_id, locale, historyPage]);
 
-  const handleRequestRefund = async (orderId: number) => {
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [userData?.user_id, locale]);
+
+  const openRefundConfirm = (item: { id: number; order_no?: string }) => {
+    const id = Number(item.id);
+    if (!id) return;
+    setRefundConfirmOrderId(id);
+    setRefundConfirmOrderLabel(String(item.order_no || `#${id}`));
+  };
+
+  const submitRefundRequest = async (orderId: number) => {
     if (!orderId || refundLoadingOrderId > 0) return;
     setRefundLoadingOrderId(orderId);
     setOrdersMessage("");
+    setOrdersMessageTone("default");
     try {
-      const res = await fetch(`/api/orders/request-refund`, {
+      const res = await fetch(`/${locale}/api/orders/request-refund`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId })
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
+      setRefundConfirmOrderId(null);
       if (!json?.status) {
-        setOrdersMessage(json?.msg || (locale === "zh" ? "退款申请失败，请稍后重试。" : "Refund request failed."));
+        const msg =
+          (json && typeof json.msg === "string" && json.msg.trim()) ||
+          (locale === "zh" ? "退款申请失败，请稍后重试。" : "Refund request failed.");
+        setOrdersMessage(msg);
+        setOrdersMessageTone("error");
       } else {
         setOrdersMessage(locale === "zh" ? "退款申请已提交，请等待处理结果。" : "Refund request submitted.");
-        const refresh = await fetch(`/api/orders/list`);
+        setOrdersMessageTone("success");
+        const refresh = await fetch(`/${locale}/api/orders/list`);
         const listJson = await refresh.json();
         setOrders(listJson?.orders || []);
       }
     } catch {
+      setRefundConfirmOrderId(null);
       setOrdersMessage(locale === "zh" ? "退款申请失败，请稍后重试。" : "Refund request failed.");
+      setOrdersMessageTone("error");
     } finally {
       setRefundLoadingOrderId(0);
     }
@@ -134,23 +182,30 @@ const PageComponent = ({
     if (cancelSubLoading) return;
     setCancelSubLoading(true);
     setOrdersMessage("");
+    setOrdersMessageTone("default");
     try {
-      const res = await fetch(`/api/subscription/cancel`, { method: "POST" });
+      const res = await fetch(`/${locale}/api/subscription/cancel`, { method: "POST" });
       const json = await res.json();
       if (!json?.status) {
         setOrdersMessage(json?.msg || (locale === "zh" ? "取消订阅失败，请稍后重试。" : "Failed to cancel subscription."));
+        setOrdersMessageTone("error");
       } else {
         setOrdersMessage(
           locale === "zh"
-            ? "订阅已提交取消，具体状态以 Creem 返回为准。"
-            : "Cancellation submitted; final state follows Creem."
+            ? "已关闭自动续费：在当前计费周期结束前权益保持不变，具体以 Creem 与支付渠道为准。"
+            : "Auto-renewal is off: you keep access until the end of the current billing period. Final details follow Creem and your payment provider."
         );
-        const refresh = await fetch(`/api/orders/list`);
-        const listJson = await refresh.json();
+        setOrdersMessageTone("success");
+        const [listJson, overviewRes] = await Promise.all([
+          fetch(`/${locale}/api/orders/list`).then((r) => r.json()),
+          fetch(`/${locale}/api/user/getSubscriptionOverview`).then((r) => r.json())
+        ]);
         setOrders(listJson?.orders || []);
+        setOverview(overviewRes || {});
       }
     } catch {
       setOrdersMessage(locale === "zh" ? "取消订阅失败，请稍后重试。" : "Failed to cancel subscription.");
+      setOrdersMessageTone("error");
     } finally {
       setCancelSubLoading(false);
     }
@@ -174,6 +229,9 @@ const PageComponent = ({
   const getStatusTag = () => {
     if (!isLogin) {
       return locale === "zh" ? "未登录" : "Not logged in";
+    }
+    if (subscriptionStatus === "scheduled_cancel") {
+      return locale === "zh" ? "已关闭续费（本周期仍有效）" : "Renewal off (active until period end)";
     }
     if (subscriptionStatus === "active" || subscriptionStatus === "trialing") {
       return locale === "zh" ? "订阅中" : "Active";
@@ -237,14 +295,16 @@ const PageComponent = ({
 
             <div className="mt-6 flex flex-wrap gap-3">
               {!isLogin ? (
-                <Link
-                  href={getLinkHref(locale, '')}
-                  onClick={() => setShowLoadingModal(true)}
+                <button
+                  type="button"
+                  onClick={() => setShowLoginModal(true)}
                   className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700"
                 >
                   {locale === "zh" ? "先去登录" : "Sign in first"}
-                </Link>
-              ) : (subscriptionStatus === "active" || subscriptionStatus === "trialing") ? (
+                </button>
+              ) : subscriptionStatus === "active" ||
+                subscriptionStatus === "trialing" ||
+                subscriptionStatus === "scheduled_cancel" ? (
                 paymentProvider === "stripe" ? (
                   <button
                     onClick={handleOpenPortal}
@@ -316,7 +376,13 @@ const PageComponent = ({
                         </td>
                       </tr>
                     )}
-                    {orders.map((item) => (
+                    {orders.map((item) => {
+                      const refundVisible =
+                        item.refund_visible ??
+                        (String(item.status) === "paid" && String(item.order_kind) === "credit_pack");
+                      const refundEligible = item.refund_eligible ?? Boolean(item.can_refund);
+                      const refundBlockKey = item.refund_block_key ?? null;
+                      return (
                       <tr key={item.id} className="border-b border-slate-100 text-slate-700">
                         <td className="py-2 pr-4 font-medium">{item.order_no || `#${item.id}`}</td>
                         <td className="py-2 pr-4">{item.order_kind}</td>
@@ -325,15 +391,28 @@ const PageComponent = ({
                         <td className="py-2 pr-4">{item.status}</td>
                         <td className="py-2 pr-4">{item.created_at_text || String(item.created_at || "").replace("T", " ").slice(0, 19)}</td>
                         <td className="py-2">
-                          {item.can_refund ? (
+                          {refundVisible ? (
                             <button
-                              onClick={() => handleRequestRefund(Number(item.id))}
-                              disabled={refundLoadingOrderId > 0}
-                              className="rounded-md border border-rose-300 px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                              type="button"
+                              disabled={!refundEligible || refundLoadingOrderId > 0}
+                              onClick={() => refundEligible && openRefundConfirm(item)}
+                              title={refundBlockHintText(locale, refundBlockKey) || undefined}
+                              className={`rounded-md border px-2.5 py-1 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                refundEligible
+                                  ? "border-rose-300 text-rose-600 hover:bg-rose-50"
+                                  : "border-slate-200 text-slate-400"
+                              }`}
                             >
-                              {refundLoadingOrderId === Number(item.id) ? (locale === "zh" ? "提交中..." : "Submitting...") : (locale === "zh" ? "申请退款" : "Request Refund")}
+                              {refundLoadingOrderId === Number(item.id)
+                                ? locale === "zh"
+                                  ? "提交中..."
+                                  : "Submitting..."
+                                : locale === "zh"
+                                  ? "申请退款"
+                                  : "Request Refund"}
                             </button>
-                          ) : item.can_cancel_subscription ? (
+                          ) : item.can_cancel_subscription &&
+                            (subscriptionStatus === "active" || subscriptionStatus === "trialing") ? (
                             <button
                               onClick={() => setShowCancelConfirm(true)}
                               disabled={cancelSubLoading}
@@ -354,12 +433,21 @@ const PageComponent = ({
                           )}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                     </tbody>
                   </table>
                 </div>
                 {ordersMessage && (
-                  <p className={`mt-3 text-sm ${ordersMessage.toLowerCase().includes("failed") || ordersMessage.includes("失败") ? "text-red-500" : "text-slate-600"}`}>
+                  <p
+                    className={`mt-3 text-sm ${
+                      ordersMessageTone === "error"
+                        ? "text-red-600"
+                        : ordersMessageTone === "success"
+                          ? "text-emerald-700"
+                          : "text-slate-600"
+                    }`}
+                  >
                     {ordersMessage}
                   </p>
                 )}
@@ -426,20 +514,88 @@ const PageComponent = ({
                     </div>
                   ))}
                 </div>
+                {historyTotalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={historyPage <= 1 || historyLoading}
+                      onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {locale === "zh" ? "上一页" : "Prev"}
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      {locale === "zh"
+                        ? `第 ${historyPage} / ${historyTotalPages} 页`
+                        : `Page ${historyPage} / ${historyTotalPages}`}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={historyPage >= historyTotalPages || historyLoading}
+                      onClick={() => setHistoryPage((p) => Math.min(historyTotalPages, p + 1))}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {locale === "zh" ? "下一页" : "Next"}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
+
+          {refundConfirmOrderId !== null && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4">
+              <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+                <h4 className="text-base font-semibold text-slate-900">
+                  {locale === "zh" ? "确认申请退款？" : "Request a refund?"}
+                </h4>
+                <p className="mt-2 text-sm text-slate-600">
+                  {locale === "zh" ? "订单：" : "Order: "}
+                  <span className="font-medium text-slate-900">{refundConfirmOrderLabel}</span>
+                </p>
+                <p className="mt-2 text-sm text-slate-600">
+                  {locale === "zh"
+                    ? "提交后订单将进入退款审核流程，请确认无误后再操作。"
+                    : "After you submit, this order will be marked for refund review. Please confirm before continuing."}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRefundConfirmOrderId(null)}
+                    disabled={refundLoadingOrderId > 0}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+                  >
+                    {locale === "zh" ? "返回" : "Back"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => submitRefundRequest(refundConfirmOrderId)}
+                    disabled={refundLoadingOrderId > 0}
+                    className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    {refundLoadingOrderId > 0
+                      ? locale === "zh"
+                        ? "提交中..."
+                        : "Submitting..."
+                      : locale === "zh"
+                        ? "确认申请"
+                        : "Confirm request"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showCancelConfirm && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4">
               <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
                 <h4 className="text-base font-semibold text-slate-900">
-                  {locale === "zh" ? "确认取消订阅？" : "Cancel subscription?"}
+                  {locale === "zh" ? "确认关闭自动续费？" : "Turn off auto-renewal?"}
                 </h4>
                 <p className="mt-2 text-sm text-slate-600">
                   {locale === "zh"
-                    ? "将向 Creem 发起立即取消（immediate）。取消后权益与账单以 Creem 与支付渠道为准。"
-                    : "We will request immediate cancellation with Creem. Access and billing follow Creem and your payment provider."}
+                    ? "将向 Creem 申请「当前计费周期结束后不再续费」：本周期内已付权益保持不变，账单与最终状态以 Creem 与支付渠道为准。"
+                    : "We will turn off auto-renewal with Creem (cancel at period end). You keep paid access through the end of the current billing period. Billing and final status follow Creem and your payment provider."}
                 </p>
                 <div className="mt-4 flex justify-end gap-2">
                   <button
@@ -467,7 +623,11 @@ const PageComponent = ({
             <div className="mt-3 space-y-2 text-sm text-slate-600">
               <p>{locale === "zh" ? "免费用户：每日最多 3 次标准处理。" : "Free users: up to 3 standard operations per day."}</p>
               <p>{locale === "zh" ? "高质量模式与高清导出按积分扣费。" : "High Quality mode and HD export consume credits."}</p>
-              <p>{locale === "zh" ? "订阅用户可通过上方按钮进入订阅管理。" : "Subscribed users can open billing portal via the button above."}</p>
+              <p>
+                {locale === "zh"
+                  ? "Creem 订阅：在订单列表中「取消订阅」为关闭下一期自动续费，本计费周期结束前通常仍可使用已付权益。"
+                  : "Creem subscriptions: “Cancel” in the order list turns off the next renewal; you usually keep paid access through the end of the current billing period."}
+              </p>
               <p>{locale === "zh" ? "积分与订阅状态均以后台实时数据为准。" : "Credits and subscription status are fetched from backend in real time."}</p>
             </div>
           </div>
