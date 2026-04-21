@@ -7,6 +7,7 @@ import { getBusinessDateString } from "~/libs/date";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadBufferToR2, getR2ConfigState } from "~/libs/R2";
 import { randomUUID } from "crypto";
+import { dataUrlExceedsUploadByteLimit, estimateDataUrlDecodedBytes } from "~/lib/clientImageUploadLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -536,6 +537,7 @@ async function pollKieTask(apiKey: string, taskId: string): Promise<string> {
 
 export async function POST(req: NextRequest) {
   const db = getDb();
+  const traceId = randomUUID();
   let jobId = 0;
   let guestCookieValue: string | undefined;
   let clearGuestCookie = false;
@@ -569,20 +571,61 @@ export async function POST(req: NextRequest) {
     if (!imageDataUrl || typeof imageDataUrl !== "string") {
       return buildResponse({ msg: "Invalid image input.", status: 400 }, 400);
     }
+
+    const loc = String(localeHint || "").toLowerCase();
+    const uploadLimitMsg = loc.startsWith("zh")
+      ? "暂时无法处理这张图片，请稍后重试。"
+      : "We couldn't process this image. Please try again.";
+
+    if (imageDataUrl.startsWith("data:image/") && dataUrlExceedsUploadByteLimit(imageDataUrl)) {
+      console.warn(
+        "[remove-shadow] upload byte limit exceeded:",
+        JSON.stringify({ trace_id: traceId, bytes: estimateDataUrlDecodedBytes(imageDataUrl) })
+      );
+      return buildResponse({ msg: uploadLimitMsg, status: 400, upload_limit: true, trace_id: traceId }, 400);
+    }
+
     if (imageDataUrl.startsWith("data:image/")) {
-      const mod = await moderateImageDataUrl(imageDataUrl);
+      console.info(
+        "[remove-shadow] moderation_start:",
+        JSON.stringify({
+          trace_id: traceId,
+          stage: "before_ai",
+          action: upscaleOnly ? "upscale_hd" : "remove",
+          image_width: imageWidth,
+          image_height: imageHeight
+        })
+      );
+      const mod = await moderateImageDataUrl(imageDataUrl, { traceId, stage: "before_ai" });
       if (mod.allowed === false) {
         if (mod.flagged) {
+          console.warn(
+            "[remove-shadow] moderation blocked:",
+            JSON.stringify({ trace_id: traceId, reason: "flagged", message: mod.message || null })
+          );
           return buildResponse(
-            { msg: mod.message || "This image did not pass content guidelines.", status: 403 },
+            { msg: mod.message || "This image did not pass content guidelines.", status: 403, trace_id: traceId },
             403
           );
         }
+        console.warn(
+          "[remove-shadow] moderation screening failed:",
+          JSON.stringify({ trace_id: traceId, reason: "rejected", message: mod.message || null })
+        );
         return buildResponse(
-          { msg: mod.message || "This image could not be screened.", status: 422 },
+          { msg: mod.message || "This image could not be screened.", status: 422, trace_id: traceId },
           422
         );
       }
+      console.info(
+        "[remove-shadow] moderation_ok:",
+        JSON.stringify({
+          trace_id: traceId,
+          stage: "before_ai",
+          skipped: Boolean(mod.skipped),
+          warning: mod.warning ?? null
+        })
+      );
     }
     if (!upscaleOnly && !maskDataUrl && !kieMaskDataUrl) {
       return buildResponse({ msg: "Mask is required for this model. Please paint over the area to remove.", status: 400 }, 400);
@@ -960,9 +1003,30 @@ export async function POST(req: NextRequest) {
         console.error("Failed to update job status:", updateErr);
       }
     }
-    console.error("AI refine failed:", err);
+    const errMessage = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : undefined;
+    console.error(
+      "[remove-shadow] request failed:",
+      JSON.stringify(
+        {
+          trace_id: traceId,
+          job_id: jobId || null,
+          locale: typeof localeHint === "string" ? localeHint : null,
+          message: errMessage,
+          stack: errStack
+        },
+        null,
+        2
+      )
+    );
     const loc = resolveAiErrorLocale(localeHint);
     const userMsg = getUserFacingAiErrorMessage(String(err), loc);
-    return buildResponse({ msg: userMsg, status: 500 }, 500, guestCookieValue, clearGuestCookie, visitorCookieValue);
+    return buildResponse(
+      { msg: userMsg, status: 500, trace_id: traceId },
+      500,
+      guestCookieValue,
+      clearGuestCookie,
+      visitorCookieValue
+    );
   }
 }

@@ -88,6 +88,8 @@ export const getToolPageText = async () => {
     autoRefineTip: tTool('autoRefineTip'),
     promptMask: tTool('promptMask'),
     processFailed: tTool('processFailed'),
+    fileExceedsMaxSize: tTool('fileExceedsMaxSize'),
+    processingCouldNotComplete: tTool('processingCouldNotComplete'),
   }
 }
 

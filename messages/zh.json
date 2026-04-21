@@ -120,7 +120,7 @@
   },
   "ToolPageText": {
     "uploadTitle": "上传图片",
-    "uploadDesc": "拖放或点击上传 (JPG, PNG, WEBP)",
+    "uploadDesc": "拖放或点击上传（JPG、PNG、WEBP）。单张最大 15MB。",
     "uploadSafetyShortLine": "上传内容将自动进行安全审核。",
     "uploadSubDesc": "一键移除纯色背景，简单又方便",
     "uploadSafetyNotice": "上传的图片将自动进行安全审核。包含违法或违反《服务条款》的内容（例如儿童性虐待材料、非法色情、未经同意的私密影像等）将无法处理。",
@@ -146,7 +146,9 @@
     "refineTip": "对遮罩进行平滑与羽化，减少边缘锯齿",
     "autoRefineTip": "自动根据图片自适应精修强度；关闭后仅使用滑杆",
     "promptMask": "请先涂抹阴影区域。",
-    "processFailed": "处理失败，请稍后重试。"
+    "processFailed": "处理失败，请稍后重试。",
+    "fileExceedsMaxSize": "请使用不超过 15 MB 的图片。",
+    "processingCouldNotComplete": "暂时无法处理这张图片，请稍后重试。"
   },
   "RemoveShadowPage": {
     "title": "在线去除照片阴影 - 免费阴影减弱工具",

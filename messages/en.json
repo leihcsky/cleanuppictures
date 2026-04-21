@@ -120,7 +120,7 @@
   },
   "ToolPageText": {
     "uploadTitle": "Upload an Image",
-    "uploadDesc": "Drag & drop or click to upload (JPG, PNG, WEBP)",
+    "uploadDesc": "Drag & drop or click to upload (JPG, PNG, WEBP). Max 15 MB per image.",
     "uploadSafetyShortLine": "Uploads are automatically reviewed for safety.",
     "uploadSubDesc": "Instantly remove solid background colors with one click. Simple and easy.",
     "uploadSafetyNotice": "Uploads are automatically reviewed for safety. Images that violate our Terms of Service or applicable law—including child sexual abuse material, illegal pornography, non-consensual intimate imagery, or other disallowed content—cannot be processed.",
@@ -146,7 +146,9 @@
     "refineTip": "Smooth and feather the mask to reduce jagged edges",
     "autoRefineTip": "Automatically adapts refine strength based on image; disable to use slider only",
     "promptMask": "Please paint over the shadow area first.",
-    "processFailed": "Processing failed. Please try again."
+    "processFailed": "Processing failed. Please try again.",
+    "fileExceedsMaxSize": "Please use an image up to 15 MB.",
+    "processingCouldNotComplete": "We couldn't process this image. Please try again."
   },
   "RemoveShadowPage": {
     "title": "Remove Shadow from Photo Online - Free Shadow Reduction Tool",

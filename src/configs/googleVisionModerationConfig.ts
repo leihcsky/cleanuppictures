@@ -49,3 +49,24 @@ export function likelihoodMeetsOrExceeds(value: string | undefined, min: VisionL
   const m = LIKELIHOOD_RANK[min] ?? LIKELIHOOD_RANK.LIKELY;
   return v >= m;
 }
+
+/** Maximum bytes to send to Vision API for moderation. Default: 8MB. */
+export function getVisionModerationMaxBytes(): number {
+  const n = Number(process.env.IMAGE_MODERATION_VISION_MAX_BYTES || 8 * 1024 * 1024);
+  if (!Number.isFinite(n) || n <= 0) return 8 * 1024 * 1024;
+  return Math.floor(n);
+}
+
+/** Longest side used for moderation-only resize. Default: 2048px. */
+export function getVisionModerationResizeMaxSide(): number {
+  const n = Number(process.env.IMAGE_MODERATION_VISION_RESIZE_MAX_SIDE || 2048);
+  if (!Number.isFinite(n) || n < 512) return 2048;
+  return Math.floor(n);
+}
+
+/** JPEG quality used for moderation-only downscaling. Default: 82. */
+export function getVisionModerationResizeJpegQuality(): number {
+  const n = Number(process.env.IMAGE_MODERATION_VISION_RESIZE_JPEG_QUALITY || 82);
+  if (!Number.isFinite(n)) return 82;
+  return Math.max(40, Math.min(92, Math.floor(n)));
+}

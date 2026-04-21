@@ -17,6 +17,8 @@ import { isActiveSubscriptionStatus } from "~/libs/subscriptionStatus";
 import { getStripe } from "~/libs/stripeClient";
 import { publicCdnUrl } from "~/libs/cdnPublic";
 import { requestClientImageModeration } from "~/libs/imageModerationClient";
+import { dataUrlExceedsUploadByteLimit, fileExceedsUploadByteLimit } from "~/lib/clientImageUploadLimits";
+import { compressImageDataUrlForApiUpload } from "~/lib/compressDataUrlForUpload";
 
 const clamp = (v:number, min:number, max:number) => Math.min(max, Math.max(min, v));
 const UPLOAD_DB_NAME = 'cleanup_upload_bridge';
@@ -520,6 +522,13 @@ export default function RemoveShadowTool({
   const processFile = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) return;
+      if (fileExceedsUploadByteLimit(file)) {
+        setInfoMessage(
+          toolText?.fileExceedsMaxSize || (locale === "zh" ? "请使用不超过 15 MB 的图片。" : "Please use an image up to 15 MB.")
+        );
+        setShowInfoModal(true);
+        return;
+      }
       sessionStorage.removeItem("cleanup_pending_upload");
       setShowReference(false);
       setHistory([]);
@@ -535,6 +544,13 @@ export default function RemoveShadowTool({
         });
       } catch {
         alert("Could not read this image.");
+        return;
+      }
+      if (dataUrlExceedsUploadByteLimit(dataUrl)) {
+        setInfoMessage(
+          toolText?.fileExceedsMaxSize || (locale === "zh" ? "请使用不超过 15 MB 的图片。" : "Please use an image up to 15 MB.")
+        );
+        setShowInfoModal(true);
         return;
       }
       const mod = await requestClientImageModeration(locale, dataUrl);
@@ -587,6 +603,16 @@ export default function RemoveShadowTool({
       const shouldAlert = () => opts?.alertOnlyIfMounted?.() ?? true;
       img.onload = async () => {
         if (/^data:image\//i.test(source)) {
+          if (dataUrlExceedsUploadByteLimit(source)) {
+            settled();
+            if (opts?.alertOnError && shouldAlert()) {
+              setInfoMessage(
+                toolText?.fileExceedsMaxSize || (locale === "zh" ? "请使用不超过 15 MB 的图片。" : "Please use an image up to 15 MB.")
+              );
+              setShowInfoModal(true);
+            }
+            return;
+          }
           const mod = await requestClientImageModeration(locale, source);
           if (mod.ok === false) {
             settled();
@@ -1284,11 +1310,31 @@ export default function RemoveShadowTool({
     try {
       setIsProcessing(true);
       setProcessingLabelOverride(locale === 'zh' ? '正在生成HD...' : 'Generating HD...');
+      const cw = canvasRef.current.width;
+      const ch = canvasRef.current.height;
+      let hdImageDataUrl = canvasRef.current.toDataURL('image/png');
+      let hdW = cw;
+      let hdH = ch;
+      try {
+        const compressed = await compressImageDataUrlForApiUpload(hdImageDataUrl, cw, ch);
+        hdImageDataUrl = compressed.imageDataUrl;
+        hdW = compressed.imageWidth;
+        hdH = compressed.imageHeight;
+      } catch {
+        setIsProcessing(false);
+        setProcessingLabelOverride('');
+        setInfoMessage(
+          toolText?.processingCouldNotComplete ||
+            (locale === "zh" ? "暂时无法处理这张图片，请稍后重试。" : "We couldn't process this image. Please try again.")
+        );
+        setShowInfoModal(true);
+        return;
+      }
       const payload = {
         action: 'upscale_hd',
-        imageDataUrl: canvasRef.current.toDataURL('image/png'),
-        imageWidth: canvasRef.current.width,
-        imageHeight: canvasRef.current.height,
+        imageDataUrl: hdImageDataUrl,
+        imageWidth: hdW,
+        imageHeight: hdH,
         locale
       };
       const { response: res, json } = await requestRemoveShadow(payload);
@@ -1303,6 +1349,15 @@ export default function RemoveShadowTool({
           const tip = json?.msg || (locale === 'zh' ? '积分不足，请购买后继续。' : 'Not enough credits. Please upgrade to continue.');
           setQuotaMessage(tip);
           setShowQuotaModal(true);
+          return;
+        }
+        if (Number(json?.status) === 400 && json?.upload_limit) {
+          setInfoMessage(
+            toolText?.processingCouldNotComplete ||
+              json?.msg ||
+              (locale === "zh" ? "暂时无法处理这张图片，请稍后重试。" : "We couldn't process this image. Please try again.")
+          );
+          setShowInfoModal(true);
           return;
         }
         if (Number(json?.status) === 403) {
@@ -1516,8 +1571,10 @@ export default function RemoveShadowTool({
 
     const createLamaResizedPayload = async (payload: any, maxSide: number) => {
       if (!canvasRef.current) return { ...payload, resizedForLama: true };
-      const baseWidth = canvasRef.current.width;
-      const baseHeight = canvasRef.current.height;
+      const baseWidth =
+        Number(payload.imageWidth) > 0 ? Number(payload.imageWidth) : canvasRef.current.width;
+      const baseHeight =
+        Number(payload.imageHeight) > 0 ? Number(payload.imageHeight) : canvasRef.current.height;
       const longest = Math.max(baseWidth, baseHeight);
       if (!Number.isFinite(maxSide) || maxSide <= 0 || longest <= maxSide) {
         return { ...payload, resizedForLama: true };
@@ -1575,14 +1632,44 @@ export default function RemoveShadowTool({
           src = prefillCanvas.toDataURL('image/png');
         }
       }
+      const w0 = canvasRef.current.width;
+      const h0 = canvasRef.current.height;
+      let apiImageDataUrl = src;
+      let apiW = w0;
+      let apiH = h0;
+      try {
+        const compressed = await compressImageDataUrlForApiUpload(src, w0, h0);
+        apiImageDataUrl = compressed.imageDataUrl;
+        apiW = compressed.imageWidth;
+        apiH = compressed.imageHeight;
+      } catch {
+        setIsProcessing(false);
+        setProcessingLabelOverride('');
+        setInfoMessage(
+          toolText?.processingCouldNotComplete ||
+            (locale === "zh" ? "暂时无法处理这张图片，请稍后重试。" : "We couldn't process this image. Please try again.")
+        );
+        setShowInfoModal(true);
+        return;
+      }
+      let maskOut = standardMaskDataUrl;
+      let kieMaskOut = kieMaskDataUrl;
+      if ((apiW !== w0 || apiH !== h0) && (maskOut || kieMaskOut)) {
+        const [m1, m2] = await Promise.all([
+          maskOut ? resizeDataUrl(maskOut, apiW, apiH, 'image/png', undefined, false) : Promise.resolve(null),
+          kieMaskOut ? resizeDataUrl(kieMaskOut, apiW, apiH, 'image/png', undefined, false) : Promise.resolve(null)
+        ]);
+        maskOut = m1;
+        kieMaskOut = m2;
+      }
       let payload = {
-        imageDataUrl: src,
-        maskDataUrl: standardMaskDataUrl,
-        kieMaskDataUrl,
+        imageDataUrl: apiImageDataUrl,
+        maskDataUrl: maskOut,
+        kieMaskDataUrl: kieMaskOut,
         scene: sceneType,
         mode: editorMode,
-        imageWidth: canvasRef.current?.width || 0,
-        imageHeight: canvasRef.current?.height || 0,
+        imageWidth: apiW,
+        imageHeight: apiH,
         quality: qualityMode,
         hd: false,
         locale
@@ -1786,6 +1873,15 @@ export default function RemoveShadowTool({
           const tip = json?.msg || (locale === 'zh' ? '免费次数已用完，请购买积分或订阅后继续。' : 'Free quota reached. Please buy credits or subscribe to continue.');
           setQuotaMessage(tip);
           setShowQuotaModal(true);
+          return;
+        }
+        if (Number(json?.status) === 400 && json?.upload_limit) {
+          setInfoMessage(
+            toolText?.processingCouldNotComplete ||
+              json?.msg ||
+              (locale === "zh" ? "暂时无法处理这张图片，请稍后重试。" : "We couldn't process this image. Please try again.")
+          );
+          setShowInfoModal(true);
           return;
         }
         if (Number(json?.status) === 403) {
