@@ -1,12 +1,14 @@
 import clsx from 'clsx';
 import { Inter } from 'next/font/google';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { ReactNode } from 'react';
 import { locales } from '~/i18n/config';
 import { CommonProvider } from '~/context/common-context';
 import { NextAuthProvider } from '~/context/next-auth-context';
 
 const inter = Inter({ subsets: ['latin'] });
+const enableGa = process.env.NODE_ENV === 'production';
 
 type Props = {
   children: ReactNode;
@@ -47,6 +49,22 @@ export default async function LocaleLayout({
         ) : null}
       </head>
       <body suppressHydrationWarning={true} className={clsx(inter.className, 'flex flex-col background-div')}>
+        {enableGa ? (
+          <>
+            <Script
+              src="https://www.googletagmanager.com/gtag/js?id=G-468DCZ2VYH"
+              strategy="afterInteractive"
+            />
+            <Script id="ga-gtag-config" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', 'G-468DCZ2VYH');
+              `}
+            </Script>
+          </>
+        ) : null}
         <NextAuthProvider>
           <CommonProvider
             commonText={commonText}
