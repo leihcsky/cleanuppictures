@@ -2312,13 +2312,8 @@ export default function RemoveShadowTool({
            </div>
            <div className="mx-auto max-w-7xl px-6 lg:px-8">
              <div className={`mx-auto max-w-5xl text-center mb-10 transition-all duration-500 ${imageSrc ? 'opacity-0 h-0 overflow-hidden mb-0 scale-95' : 'opacity-100 scale-100'}`}>
-                <h1 className={`text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl ${isHomeTool ? 'max-w-4xl mx-auto leading-tight' : 'lg:whitespace-nowrap'}`}>
-                  {isHomeTool ? (
-                    <>
-                      <span className="block">Remove Objects, Text, People</span>
-                      <span className="block">from Images Instantly</span>
-                    </>
-                  ) : pageText.h1}
+               <h1 className={`text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl ${isHomeTool ? 'max-w-4xl mx-auto leading-tight' : 'lg:whitespace-nowrap'}`}>
+                  {pageText.h1}
                 </h1>
                 <p className="mt-6 text-lg leading-8 text-slate-600">{pageText.description}</p>
                 <div className="mt-8 flex items-center justify-center gap-x-6">
@@ -2748,14 +2743,18 @@ export default function RemoveShadowTool({
                 <div className="text-center mb-10">
                   <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900">{pageText.removeWhatTitle || 'What can you remove?'}</h2>
                 </div>
-                <div className="flex flex-wrap items-stretch gap-3 md:gap-4 justify-center">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-6 md:gap-4">
                   {pageText.removeItems.map((item: any, idx: number) => (
                     <Link
                       key={`${item.href}-${idx}`}
                       href={getLinkHref(locale, item.href)}
-                      className={`group inline-flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-slate-800 font-medium hover:border-primary-300 hover:text-primary-700 transition-colors ${idx % 3 === 0 ? 'min-w-[280px]' : idx % 3 === 1 ? 'min-w-[320px]' : 'min-w-[300px]'}`}
+                      className={`group inline-flex min-h-[56px] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-center text-[15px] md:text-base text-slate-800 font-medium hover:border-primary-300 hover:text-primary-700 transition-colors md:col-span-2 ${
+                        idx === 3 ? "md:col-start-2" : ""
+                      } ${
+                        idx === 4 ? "md:col-start-4" : ""
+                      }`}
                     >
-                      <span className="leading-relaxed">{item.label}</span>
+                      <span className="leading-relaxed text-center">{item.label}</span>
                       <span className="text-slate-400 group-hover:text-primary-600 transition-colors">{'>'}</span>
                     </Link>
                   ))}

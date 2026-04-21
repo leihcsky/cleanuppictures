@@ -8,7 +8,7 @@ export async function generateMetadata({ params: { locale = '' } }) {
   setRequestLocale(locale);
   const brand = 'Pic Cleaner';
   const origin = getPublicSiteOriginNoSlash();
-  const title = "AI Image Cleanup Tool | Object Remover for Photos Online";
+  const title = "Photo Cleanup Tool Online | AI Image Cleaner by Pic Cleaner";
   const description = "Remove unwanted objects and distractions from photos online in a few clicks. Upload, brush the area, and download clean results in JPG, PNG, or WebP.";
   const canonicalUrl = absoluteCanonicalUrl(origin, locale, "");
     return {
@@ -54,12 +54,12 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
 
   const pageText = {
     ...removeShadowText,
-    h1: "Remove Objects, Text, People from Images Instantly",
+    h1: "Photo Cleanup Tool to Remove Distractions Instantly",
     description: "Clean up your photos in seconds. Remove distractions with a simple brush and get natural-looking results.",
     aboutTitle: "About the AI Image Cleanup Tool",
-    aboutDesc: "This is your main workspace for photo cleanup. Upload an image, paint over what you want gone, and get a clean result that still looks natural.",
+    aboutDesc: "This AI photo cleanup tool is your main workspace for photo cleanup. Upload an image, paint over what you want gone, and get a clean result that still looks natural.",
     featureTitle: "Why people like this tool",
-    featureDesc: "It is easy to use, fast to run, and gives you clear before-and-after feedback so you can fine-tune results quickly.",
+    featureDesc: "This AI photo cleanup tool is easy to use, fast to run, and gives you clear before-and-after feedback so you can fine-tune results quickly.",
     useCasesTitle: "Use-cases",
     useCasesDesc: "• **Photographers**: remove tourists, wires, distractions.\n• **Creative Agencies**: clean assets for campaigns and social.\n• **Real Estate**: tidy room photos for better presentation.\n• **E-commerce**: remove defects, labels, or reflections.",
     sampleTitle: "Before / After Examples",
@@ -72,8 +72,8 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     sample3Desc: "Remove small interior distractions like tissue boxes and clutter to keep listing photos neat and professional.",
     sample4Title: "Ecommerce Sellers: Remove Emoji/Sticker Marks",
     sample4Desc: "Clean sticker or emoji marks from product photos to keep catalog images consistent, clear, and conversion-friendly.",
-    faq1Q: "What can this AI cleanup tool remove?",
-    faq1A: "You can remove people, objects, text overlays, shadows, glare and other distractions by painting over the area.",
+    faq1Q: "What is an AI photo cleanup tool?",
+    faq1A: "An AI photo cleanup tool removes unwanted distractions from photos. You can erase objects, people, text overlays, shadows, glare, and other visual clutter by painting over the area.",
     faq2Q: "Do I need Photoshop skills?",
     faq2A: "No. Just upload your photo, brush the part you want to remove, and click run.",
     faq3Q: "Can I edit high-resolution photos?",
@@ -88,11 +88,11 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     faq7A: "You can export cleaned images as PNG, JPG, or WebP.",
     removeWhatTitle: "What can you remove?",
     removeItems: [
-      { label: "object remover for photos", href: "object-remover-for-photos" },
-      { label: "remove people from photo", href: "remove-person-from-photo" },
-      { label: "remove text from images", href: "remove-text-from-images" },
-      { label: "remove shadow from photo", href: "remove-shadow" },
-      { label: "remove emoji from photo", href: "remove-emoji-from-photo" }
+      { label: "ai object cleanup", href: "object-remover-for-photos" },
+      { label: "ai person removal", href: "remove-person-from-photo" },
+      { label: "ai text cleanup", href: "remove-text-from-images" },
+      { label: "ai shadow cleanup", href: "remove-shadow" },
+      { label: "ai emoji cleanup", href: "remove-emoji-from-photo" }
     ]
   };
   const toolText = await languageModule.getToolPageText();
@@ -133,7 +133,7 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "AI Image Cleanup Tool",
+      "name": "AI Photo Cleanup Tool",
       "description": pageText.description,
       "applicationCategory": "PhotographyApplication",
       "operatingSystem": "Web",

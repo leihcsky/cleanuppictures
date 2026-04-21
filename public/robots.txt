@@ -6,3 +6,12 @@ Disallow: /api*
 Disallow: /*/api
 Disallow: /*/api/
 Disallow: /*/api*
+Disallow: /my
+Disallow: /my/
+Disallow: /*/my
+Disallow: /*/my/
+Disallow: /billing/success
+Disallow: /billing/success/
+Disallow: /*/billing/success
+Disallow: /*/billing/success/
+Sitemap: https://cleanuppictures.org/sitemap.xml
