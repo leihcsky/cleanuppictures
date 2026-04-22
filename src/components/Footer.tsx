@@ -40,6 +40,19 @@ export default function Footer({
             <p className="text-sm leading-6 text-slate-600">
               {commonText.footerDescText}
             </p>
+            <a
+              href="https://toolfame.com/item/pic-cleaner"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex"
+              aria-label="Featured on toolfame.com"
+            >
+              <img
+                src="https://toolfame.com/badge-light.svg"
+                alt="Featured on toolfame.com"
+                className="h-7 w-auto md:h-8"
+              />
+            </a>
           </div>
           <div className="mt-16 grid grid-cols-2 gap-8 xl:col-span-2 xl:mt-0">
             <div className="md:grid md:grid-cols-2 md:gap-8">
