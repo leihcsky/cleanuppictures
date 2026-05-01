@@ -27,7 +27,7 @@ export default function Footer({
       </div>
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
         <div className="xl:grid xl:grid-cols-3 xl:gap-8">
-          <div className="space-y-8">
+          <div className="space-y-4">
             <Link
               href={getLinkHref(locale, '')}
             >
@@ -44,7 +44,7 @@ export default function Footer({
               href="https://toolfame.com/item/pic-cleaner"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex"
+              className="inline-flex -mt-1"
               aria-label="Featured on toolfame.com"
             >
               <img

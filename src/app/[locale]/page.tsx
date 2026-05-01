@@ -86,13 +86,13 @@ export default async function IndexPage({ params: { locale = '' }, searchParams 
     faq6A: "Images are processed only for editing and are not published publicly by default.",
     faq7Q: "What formats can I export?",
     faq7A: "You can export cleaned images as PNG, JPG, or WebP.",
-    removeWhatTitle: "What can you remove?",
+    removeWhatTitle: "Related tools",
     removeItems: [
-      { label: "ai object cleanup", href: "object-remover-for-photos" },
-      { label: "ai person removal", href: "remove-person-from-photo" },
-      { label: "ai text cleanup", href: "remove-text-from-images" },
-      { label: "ai shadow cleanup", href: "remove-shadow" },
-      { label: "ai emoji cleanup", href: "remove-emoji-from-photo" }
+      { label: "Object remover for photos", href: "object-remover-for-photos" },
+      { label: "Remove people from photo", href: "remove-person-from-photo" },
+      { label: "Remove text from images", href: "remove-text-from-images" },
+      { label: "Remove shadow from photo", href: "remove-shadow" },
+      { label: "Remove emoji from photo", href: "remove-emoji-from-photo" }
     ]
   };
   const toolText = await languageModule.getToolPageText();

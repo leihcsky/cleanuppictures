@@ -51,6 +51,12 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
   const pageUrl = absoluteCanonicalUrl(origin, locale, "remove-emoji-from-photo");
   const homeCanonicalUrl = absoluteCanonicalUrl(origin, locale, "");
   const homeModeHref = `${getLinkHref(locale, '')}?mode=text`;
+  const relatedTools = [
+    { label: "Object remover for photos", href: "object-remover-for-photos" },
+    { label: "Remove text from images", href: "remove-text-from-images" },
+    { label: "Remove people from photo", href: "remove-person-from-photo" },
+    { label: "Remove shadow from photo", href: "remove-shadow" }
+  ];
   const px = (remote: string) => getImageProxyHref(locale, remote);
   const cases = [
     {
@@ -201,7 +207,7 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
                       <p className="mt-3 text-sm text-slate-500">{item.note}</p>
                       <div className="mt-5">
                         <Link href={homeModeHref} className="inline-flex items-center rounded-full bg-primary-600 px-6 py-2.5 text-white font-semibold hover:bg-primary-700 transition-colors">
-                          Start Removing Now
+                          Start editing your image
                         </Link>
                       </div>
                     </div>
@@ -224,6 +230,26 @@ export default function RemoveEmojiFromPhotoPage({ params: { locale } }) {
                   <p className="mt-2 text-sm text-slate-300">{item.a}</p>
                 </div>
               ))}
+            </div>
+          </section>
+          <section className="mt-14 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+            <h2 className="text-2xl font-semibold text-slate-900">Related tools</h2>
+            <p className="mt-3 text-slate-600">Need a different cleanup type? Try object, text, person, or shadow removal pages.</p>
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {relatedTools.map((tool) => (
+                <Link
+                  key={tool.href}
+                  href={getLinkHref(locale, tool.href)}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 hover:text-primary-700 hover:border-primary-300 transition-colors"
+                >
+                  {tool.label}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-6">
+              <Link href={homeModeHref} className="inline-flex items-center rounded-full bg-primary-600 px-6 py-2.5 text-white font-semibold hover:bg-primary-700 transition-colors">
+                Start editing your image
+              </Link>
             </div>
           </section>
         </div>
